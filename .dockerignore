@@ -1,0 +1,28 @@
+# Heavy/irrelevant for the judge service Docker build context.
+.git/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Model weights — not needed by the judge service.
+actor_hf/
+critic_hf/
+
+# Frontend lives in its own deployable.
+NLA frontend/
+
+# Steering pipelines and demos are out of scope for the judge service.
+steering/
+scripts/
+examples/
+
+# Docs.
+contextmd/
+*.md
+LICENSE
+
+# Python distribution byproducts.
+build/
+dist/
+*.egg-info/
