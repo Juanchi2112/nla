@@ -13,6 +13,21 @@ if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
     exit 1
 fi
 
+# Triton JIT-compiles a C helper at first GPU op and needs Python.h.
+# On Ubuntu/Debian containers, python3.11-dev is usually missing.
+PY_INCLUDE_DIR="$("$PYTHON_BIN" -c 'import sysconfig; print(sysconfig.get_path("include"))')"
+if [ ! -f "$PY_INCLUDE_DIR/Python.h" ]; then
+    echo "[setup] Python.h not found at $PY_INCLUDE_DIR (Triton needs it)."
+    if command -v apt-get >/dev/null 2>&1 && [ "$(id -u)" = "0" ]; then
+        PY_VERSION="$("$PYTHON_BIN" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+        echo "[setup] Installing python${PY_VERSION}-dev via apt-get"
+        apt-get update -qq
+        apt-get install -y "python${PY_VERSION}-dev"
+    else
+        echo "[setup] WARNING: cannot auto-install. Run: sudo apt-get install python3.11-dev" >&2
+    fi
+fi
+
 if [ ! -d "$VENV_DIR" ]; then
     echo "[setup] Creating venv at $VENV_DIR with $PYTHON_BIN"
     "$PYTHON_BIN" -m venv "$VENV_DIR"
