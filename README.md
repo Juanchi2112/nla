@@ -20,8 +20,8 @@ during actor training. Low MSE ⟹ the critic can recover the original
 direction from the actor's words alone.
 
 **What's here:**
-- `nla_inference.py` — single-file ACTOR client (no heavy deps, SGLang input_embeds)
-- `examples/` — worked transcripts with per-token MSE
+- `gpu/nla_inference.py` — single-file ACTOR client (no heavy deps, SGLang input_embeds)
+- `gpu/examples/` — worked transcripts with per-token MSE
 - This README — full recipe, model-specific params, critic architecture, debugging
 
 **Weights** (HF Hub — [`kitft/nla-models` collection](https://huggingface.co/collections/kitft/nla-models)):

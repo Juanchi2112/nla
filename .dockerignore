@@ -1,26 +1,29 @@
-# Heavy/irrelevant for the judge service Docker build context.
+# Heavy/irrelevant for the backend Docker build context.
 .git/
 .venv/
 __pycache__/
 *.pyc
 .DS_Store
 
-# Model weights — not needed by the judge service.
+# Model weights — vast.ai-side only.
 actor_hf/
 critic_hf/
 
-# Frontend lives in its own deployable.
-NLA frontend/
+# Frontend lives in its own deployable (Vercel).
+frontend/
 
-# Steering pipelines and demos are out of scope for the judge service.
-steering/
-scripts/
-examples/
+# GPU-only code: server.py + scripts + nla_inference + examples. Lives on vast.ai.
+gpu/
+
+# Tests not needed in production image.
+tests/
 
 # Docs.
-contextmd/
 *.md
 LICENSE
+
+# CI / dev tooling not needed in image.
+.github/
 
 # Python distribution byproducts.
 build/

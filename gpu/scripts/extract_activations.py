@@ -5,13 +5,13 @@ Output schema mirrors kitft/natural_language_autoencoders/nla/datagen/stage0_ext
   activation_vector (list<float32, 3584>), activation_layer (int64), doc_id (string)
 
 The resulting parquet plugs directly into:
-    python nla_inference.py ./actor_hf --parquet vectors.parquet
+    python gpu/nla_inference.py ./actor_hf --parquet vectors.parquet
 
 Designed for a sequential workflow on a single 24 GB GPU (e.g. RTX 4090):
   1. Run this script (loads Qwen base, ~14 GB bf16 in VRAM)
   2. Script frees VRAM on exit
   3. Launch SGLang with the NLA actor
-  4. Decode with nla_inference.py --parquet
+  4. Decode with gpu/nla_inference.py --parquet
 
 Hook pattern verified against upstream:
     natural_language_autoencoders/nla/datagen/extractors.py:70-159
@@ -134,8 +134,8 @@ def main() -> None:
 
     print(f"\n[extract] Wrote {len(rows)} rows to {args.output}")
     print("[extract] Next steps:")
-    print("  1. bash scripts/launch_sglang.sh           # in another terminal")
-    print(f"  2. python nla_inference.py ./actor_hf --parquet {args.output} --n 20")
+    print("  1. bash gpu/scripts/launch_sglang.sh       # in another terminal")
+    print(f"  2. python gpu/nla_inference.py ./actor_hf --parquet {args.output} --n 20")
 
 
 if __name__ == "__main__":

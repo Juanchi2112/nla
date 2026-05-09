@@ -1,10 +1,10 @@
-"""FastAPI orchestrator for NLA monitoring.
+"""FastAPI backend for NLA monitoring (orchestrator + judge in-process).
 
-Wires the frontend to two upstream services:
-    - Judge service (this repo, judge_service/)  — POST /judge per monologue.
-    - GPU /decode endpoint (this repo, server.py) — TBD URL, opt-in via env.
+The judge logic that used to live in a separate `judge_service/` runs here
+directly via `backend.judge_runner.JudgeRunner` — no inter-service HTTP hop.
+The GPU /decode endpoint (vast.ai) is the only upstream dependency now.
 
-Default backend is the local mock generator: produces canned tokens and
+Default GPU backend is the local mock generator: produces canned tokens and
 curated monologues at a realistic pace so the rest of the stack
 (frontend, SSE, judge) can be exercised without a GPU.
 
@@ -15,13 +15,16 @@ Endpoints:
     POST /api/cancel/{id}       — request stop
     GET  /healthz               — liveness + config snapshot
 
-Env (all optional except as noted):
+Env (all optional except where noted):
     PORT                  set by Railway
     CORS_ORIGINS          "*" (default; comma-separated)
-    JUDGE_URL             "http://localhost:8000" (judge service base URL)
-    JUDGE_TIMEOUT         "5.0" seconds
+    JUDGE_BACKEND         "regex" (default) | "claude"
+    JUDGE_MODEL           "claude-haiku-4-5" (only used when backend=claude)
+    ANTHROPIC_API_KEY     required when JUDGE_BACKEND=claude
     ORCHESTRATOR_GPU      "mock" (default) | "decoder"
     GPU_URL               required when ORCHESTRATOR_GPU=decoder
+    GPU_SKIP_FIRST        "10"
+    GPU_TIMEOUT           "120.0" seconds
     MAX_NEW_TOKENS        "128"
 """
 
@@ -45,7 +48,7 @@ from .gpu import (
     GPUNotConfiguredError,
 )
 from .gpu.decoder_endpoint import URL_PLACEHOLDER
-from .judge_client import JudgeClient
+from .judge_runner import JudgeRunner
 from .mock_generator import COMPLIANT_MONOLOGUES, MockGPUClient
 from .schemas import (
     CancelResponse,
@@ -61,14 +64,14 @@ from .schemas import (
 )
 from .sessions import SessionRegistry, SessionState
 
-log = logging.getLogger("orchestrator")
+log = logging.getLogger("backend")
 logging.basicConfig(level=logging.INFO)
 
 
 # ─── Config ───────────────────────────────────────────────────────────────
 
-JUDGE_URL = os.environ.get("JUDGE_URL", "http://localhost:8000")
-JUDGE_TIMEOUT = float(os.environ.get("JUDGE_TIMEOUT", "5.0"))
+JUDGE_BACKEND = os.environ.get("JUDGE_BACKEND", "regex").lower()
+JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "claude-haiku-4-5")
 ORCH_GPU = os.environ.get("ORCHESTRATOR_GPU", "mock").lower()
 GPU_URL = os.environ.get("GPU_URL", URL_PLACEHOLDER)
 GPU_SKIP_FIRST = int(os.environ.get("GPU_SKIP_FIRST", "10"))
@@ -93,7 +96,7 @@ def _build_gpu_client() -> GPUClient:
 
 
 class AppState:
-    judge: JudgeClient
+    judge: JudgeRunner
     gpu: GPUClient
     sessions: SessionRegistry
 
@@ -102,14 +105,14 @@ class AppState:
 async def lifespan(app: FastAPI):
     state = AppState()
     state.sessions = SessionRegistry()
-    state.judge = JudgeClient(JUDGE_URL, timeout=JUDGE_TIMEOUT)
+    state.judge = JudgeRunner(backend=JUDGE_BACKEND, model=JUDGE_MODEL)
     await state.judge.start()
     state.gpu = _build_gpu_client()
     app.state.orch = state
     log.info(
-        "orchestrator ready — gpu=%s judge=%s",
+        "backend ready — gpu=%s judge=%s",
         ORCH_GPU,
-        JUDGE_URL,
+        JUDGE_BACKEND,
     )
     try:
         yield
@@ -120,10 +123,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="NLA Orchestrator",
+    title="NLA Backend",
     description=(
-        "Coordinates the frontend, the judge service, and the GPU /decode "
-        "endpoint. Streams tokens + judge verdicts over SSE."
+        "Orchestrator + in-process judge for NLA monitoring. Streams tokens "
+        "and judge verdicts over SSE; talks to a remote GPU /decode endpoint "
+        "for real activations (or a local mock for dev)."
     ),
     version="0.1.0",
     lifespan=lifespan,
@@ -269,15 +273,14 @@ async def _produce(state: AppState, session: SessionState) -> None:
 @app.get("/healthz")
 async def healthz(request: Request) -> dict[str, Any]:
     state = _state(request)
-    judge_health = await state.judge.healthz()
     return {
         "status": "ok",
         "gpu_backend": ORCH_GPU,
         "gpu_url_set": GPU_URL != URL_PLACEHOLDER,
         "gpu_url": GPU_URL if GPU_URL != URL_PLACEHOLDER else None,
         "gpu_skip_first": GPU_SKIP_FIRST,
-        "judge_url": JUDGE_URL,
-        "judge_reachable": judge_health is not None,
+        "judge_backend": state.judge.backend,
+        "judge_model": state.judge.model,
         "max_new_tokens": MAX_NEW_TOKENS,
     }
 

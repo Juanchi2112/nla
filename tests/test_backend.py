@@ -1,8 +1,9 @@
-"""Integration tests for orchestrator using TestClient.
+"""Integration tests for the backend (orchestrator + in-process judge).
 
-The orchestrator's only external dep is the judge service. We patch the
-JudgeClient at import time to return canned verdicts, so these tests run
-fast without spinning up a second uvicorn process.
+The backend's only external dep is the GPU /decode endpoint (mocked here
+via ORCHESTRATOR_GPU=mock). The judge is in-process — we patch the
+`JudgeRunner` constructor with a stub that returns canned verdicts so we
+don't need an Anthropic API key for CI.
 """
 
 from __future__ import annotations
@@ -14,40 +15,31 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-# Configure orchestrator BEFORE importing it (lifespan reads env at startup).
+# Configure the backend BEFORE importing it (lifespan reads env at startup).
 os.environ.setdefault("ORCHESTRATOR_GPU", "mock")
-# Point at a URL nothing's listening on — judge_client.judge() will return
-# None on transport error, which is the path we want to exercise.
-# For the steer test we override judge inside the client.
-os.environ.setdefault("JUDGE_URL", "http://localhost:1")
-os.environ.setdefault("JUDGE_TIMEOUT", "0.5")
+os.environ.setdefault("JUDGE_BACKEND", "regex")
+os.environ.setdefault("CORS_ORIGINS", "http://example.com,http://localhost:3000")
 
-from orchestrator.app import app  # noqa: E402
-from orchestrator.judge_client import JudgeClient  # noqa: E402
-from orchestrator.schemas import JudgeVerdict  # noqa: E402
+from backend.app import app  # noqa: E402
+from backend.judge_runner import JudgeRunner  # noqa: E402
+from backend.schemas import JudgeVerdict  # noqa: E402
 
-# ─── Helper: simulate "judge always flags tool_misreport" ──────────────────
+# ─── Stub: skip the real Judge instantiation, return canned verdicts ──────
 
 
-class StubJudgeClient(JudgeClient):
-    """Drop-in: returns a canned verdict for every call. No network."""
+class StubJudgeRunner(JudgeRunner):
+    """Bypasses parent __init__ (which would build a real RegexJudge or
+    instantiate the Anthropic SDK). Returns flagged verdicts when the
+    monologue contains the substrings the mock generator emits, so the
+    flagged-trace assertion fires without round-tripping through nla_judge.
+    """
 
     def __init__(self):  # noqa: D401 — overrides parent
-        self.base_url = "stub://"
-
-    async def start(self) -> None:
-        return None
-
-    async def stop(self) -> None:
-        return None
-
-    async def healthz(self):
-        return {"status": "ok", "backend": "stub"}
+        # Skip super().__init__()
+        self._backend = "stub"
+        self._model = "n/a"
 
     async def judge(self, s: str, mode: str):  # noqa: ARG002
-        # Flag any monologue that mentions "fabricat", "override", "false claim";
-        # otherwise compliant. Mirrors the regex backend roughly so our mock
-        # generator's tool_misreport monologues fire.
         s_lower = s.lower()
         if any(k in s_lower for k in ("fabricat", "override", "false claim")):
             return JudgeVerdict(
@@ -67,15 +59,6 @@ class StubJudgeClient(JudgeClient):
 
 
 @pytest.fixture(scope="module")
-def client(monkeypatch_module):
-    """Yield a TestClient with the JudgeClient stubbed."""
-    # Patch the JudgeClient class used by the lifespan to instantiate our stub.
-    monkeypatch_module.setattr("orchestrator.app.JudgeClient", lambda *a, **k: StubJudgeClient())
-    with TestClient(app) as c:
-        yield c
-
-
-@pytest.fixture(scope="module")
 def monkeypatch_module():
     """Module-scoped monkeypatch (default fixture is function-scoped)."""
     from _pytest.monkeypatch import MonkeyPatch
@@ -83,6 +66,14 @@ def monkeypatch_module():
     mp = MonkeyPatch()
     yield mp
     mp.undo()
+
+
+@pytest.fixture(scope="module")
+def client(monkeypatch_module):
+    """Yield a TestClient with the JudgeRunner replaced by our stub."""
+    monkeypatch_module.setattr("backend.app.JudgeRunner", lambda *a, **k: StubJudgeRunner())
+    with TestClient(app) as c:
+        yield c
 
 
 # ─── Helper: parse SSE response into events ────────────────────────────────
@@ -116,6 +107,12 @@ def test_healthz(client: TestClient):
     assert body["status"] == "ok"
     assert body["gpu_backend"] == "mock"
     assert body["gpu_url_set"] is False
+    # Judge is in-process now — no judge_url field
+    assert "judge_url" not in body
+    assert "judge_reachable" not in body
+    # New fields from JudgeRunner
+    assert body["judge_backend"] == "stub"
+    assert body["judge_model"] == "n/a"
 
 
 # ─── /api/generate + /api/stream ───────────────────────────────────────────
@@ -228,3 +225,52 @@ def test_cancel_404_when_session_missing(client: TestClient):
 def test_generate_validation_422(client: TestClient, payload: dict):
     r = client.post("/api/generate", json=payload)
     assert r.status_code == 422
+
+
+# ─── OpenAPI schema (migrated from test_judge_service.py) ──────────────────
+
+
+def test_openapi_reachable(client: TestClient):
+    r = client.get("/openapi.json")
+    assert r.status_code == 200
+    paths = r.json()["paths"]
+    # Backend exposes the /api/* endpoints + /healthz
+    assert "/healthz" in paths
+    assert "/api/generate" in paths
+    assert "/api/steer" in paths
+
+
+def test_openapi_does_not_expose_judge(client: TestClient):
+    """After the merge, /judge is NOT a public endpoint — judge runs in-process."""
+    r = client.get("/openapi.json")
+    paths = r.json()["paths"]
+    assert "/judge" not in paths
+    assert "/rubrics" not in paths
+
+
+# ─── CORS (migrated from test_judge_service.py) ────────────────────────────
+
+
+def test_cors_allowed_origin(client: TestClient):
+    r = client.options(
+        "/api/generate",
+        headers={
+            "Origin": "http://example.com",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert r.status_code == 200
+    assert r.headers.get("access-control-allow-origin") == "http://example.com"
+
+
+def test_cors_blocks_disallowed_origin(client: TestClient):
+    r = client.options(
+        "/api/generate",
+        headers={
+            "Origin": "http://evil.example",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    # Disallowed origin → CORS middleware doesn't echo the origin header back
+    assert r.headers.get("access-control-allow-origin") != "http://evil.example"
