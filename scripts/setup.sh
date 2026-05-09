@@ -4,6 +4,8 @@ set -euo pipefail
 PYTHON_BIN="${PYTHON_BIN:-python3.11}"
 MODEL_REPO="${MODEL_REPO:-kitft/nla-qwen2.5-7b-L20-av}"
 MODEL_DIR="${MODEL_DIR:-./actor_hf}"
+CRITIC_REPO="${CRITIC_REPO:-kitft/nla-qwen2.5-7b-L20-ar}"
+CRITIC_DIR="${CRITIC_DIR:-./critic_hf}"
 VENV_DIR="${VENV_DIR:-.venv}"
 
 cd "$(dirname "$0")/.."
@@ -49,8 +51,19 @@ else
     echo "[setup] $MODEL_DIR already exists, skipping download"
 fi
 
+# AR (activation reconstructor): truncated K+1-layer LM + Linear(d,d) head.
+# Used in-process via NLACritic. text -> activation vector. Needed for
+# the steering loop (compute_delta uses AR.reconstruct).
+if [ ! -d "$CRITIC_DIR" ]; then
+    echo "[setup] Downloading $CRITIC_REPO -> $CRITIC_DIR (~10 GB, truncated backbone)"
+    hf download "$CRITIC_REPO" --local-dir "$CRITIC_DIR"
+else
+    echo "[setup] $CRITIC_DIR already exists, skipping download"
+fi
+
 echo
 echo "[setup] Done."
-echo "  Activate venv:   source $VENV_DIR/bin/activate"
-echo "  Launch SGLang:   bash scripts/launch_sglang.sh   (terminal 1)"
-echo "  Smoke test:      bash scripts/smoke_test.sh      (terminal 2)"
+echo "  Activate venv:        source $VENV_DIR/bin/activate"
+echo "  Launch SGLang (AV):   bash scripts/launch_sglang.sh   (terminal 1)"
+echo "  Smoke test (AV):      bash scripts/smoke_test.sh      (terminal 2)"
+echo "  AR sanity test:       python scripts/test_critic.py   (any terminal, no SGLang needed)"

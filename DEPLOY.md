@@ -4,11 +4,13 @@ Pasos para levantar este repo en una VM con GPU.
 
 ## Requisitos
 
-- GPU NVIDIA con ≥ 16 GB VRAM (L4 24GB, A10 24GB, RTX 4090, A100 — todas funcionan)
+- GPU NVIDIA con ≥ 16 GB VRAM para validación cualitativa (L4 24GB, A10 24GB, RTX 4090).
+- **Para el steering loop completo (Qwen base + AV + AR cohabitando): A100 80GB** (cómodo)
+  o A100 40GB (apretado, AR en CPU). Ver § Sizing para steering.
 - Driver NVIDIA ≥ 535, CUDA 12.1+
-- Ubuntu 22.04 / Debian 12 (otras distros probablemente andan)
+- Ubuntu 22.04 / Debian 12
 - Python 3.11
-- ~40 GB de disco libre (15 GB pesos + venv + caches HF)
+- ~50 GB de disco libre (15 GB AV + 10 GB AR + 14 GB Qwen base + venv + caches HF)
 
 ## Pasos
 
@@ -33,7 +35,7 @@ bash scripts/launch_sglang.sh
 
 Esperá a ver `The server is fired up and ready to roll!` antes de seguir.
 
-**4. Smoke test** (terminal 2)
+**4. Smoke test del AV** (terminal 2)
 
 ```bash
 bash scripts/smoke_test.sh
@@ -41,6 +43,16 @@ bash scripts/smoke_test.sh
 
 Genera 1 explicación con un vector random.
 **Si la salida es inglés → OK**. Si es CJK / chino → algo falló (ver `README.md` § Debugging).
+
+**5. Sanity test del AR** (terminal 2, no necesita SGLang)
+
+```bash
+python scripts/test_critic.py
+```
+
+Carga `NLACritic` desde `./critic_hf` y valida que `reconstruct(text)` produce
+vectores con geometría semántica coherente (textos similares → cos alto, distintos → cos bajo).
+Si falla, `compute_delta` del steering loop estará roto. Ver `README.md` § critic.
 
 ## Pipeline end-to-end (Qwen base → NLA)
 
@@ -75,13 +87,46 @@ El smoke test usa un vector random. Para probar con activations **reales** del r
 | var | default | uso |
 |---|---|---|
 | `PYTHON_BIN` | `python3.11` | binario de python para el venv |
-| `MODEL_REPO` | `kitft/nla-qwen2.5-7b-L20-av` | repo HF con los pesos |
-| `MODEL_DIR` | `./actor_hf` | dónde se descargan los pesos |
+| `MODEL_REPO` | `kitft/nla-qwen2.5-7b-L20-av` | repo HF con los pesos del AV (verbalizer) |
+| `MODEL_DIR` | `./actor_hf` | dónde se descargan los pesos del AV |
+| `CRITIC_REPO` | `kitft/nla-qwen2.5-7b-L20-ar` | repo HF con los pesos del AR (reconstructor) |
+| `CRITIC_DIR` | `./critic_hf` | dónde se descargan los pesos del AR |
 | `VENV_DIR` | `.venv` | venv path |
 | `PORT` | `30000` | puerto SGLang |
-| `MEM_FRAC` | `0.85` | `--mem-fraction-static` |
+| `MEM_FRAC` | `0.85` | `--mem-fraction-static` para SGLang (AV standalone). Para steering loop en A100 cohabitando con Qwen+AR, override a `0.30` (80GB) o `0.20` (40GB). |
 
 Ej: `MODEL_DIR=/data/qwen bash scripts/setup.sh`
+
+## Sizing para steering (1× A100)
+
+El steering loop necesita **Qwen base + AV (en SGLang) + AR (in-process)** simultáneos.
+
+**A100 80GB (recomendado)**:
+- Qwen base bf16: ~14 GB
+- SGLang AV con `MEM_FRAC=0.30`: ~24 GB pre-allocated
+- AR truncado bf16: ~10 GB
+- Headroom: ~10 GB
+- **Total: ~58/80 GB** — cómodo.
+
+**A100 40GB (apretado)**:
+- Qwen base: ~14 GB
+- SGLang AV con `MEM_FRAC=0.20`: ~8 GB
+- AR en CPU (`device="cpu"` en `NLACritic`): 0 GB GPU, ~10 GB RAM, ~3s por reconstruct
+- Headroom: ~18 GB
+- **Total GPU: ~22/40 GB** — funciona pero margen mínimo. Cualquier OOM por activations
+  altas requiere bajar `MEM_FRAC` a 0.15 o capar context-length.
+
+Lanzamiento:
+
+```bash
+# A100 80GB
+MEM_FRAC=0.30 bash scripts/launch_sglang.sh
+
+# A100 40GB
+MEM_FRAC=0.20 bash scripts/launch_sglang.sh
+# y al instanciar NLACritic en tu código:
+# critic = NLACritic("./critic_hf", device="cpu")
+```
 
 ## Otros modelos
 
