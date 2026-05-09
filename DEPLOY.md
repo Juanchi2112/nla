@@ -82,6 +82,22 @@ El smoke test usa un vector random. Para probar con activations **reales** del r
 
 **Textos de prueba**: están hardcoded en `scripts/extract_activations.py` (`TEST_TEXTS`). Editá ese list para probar con otros textos.
 
+### Validación cuantitativa: round-trip fidelity (necesario antes del steering loop)
+
+Cierra el ciclo `h → AV → s → AR → ĥ` y mide `cos(h, ĥ)`. Si esto pasa, el AR produce direcciones útiles para `compute_delta` y el steering loop es viable.
+
+```bash
+# Con SGLang corriendo y vectors.parquet ya extraído:
+python scripts/roundtrip_real.py --parquet vectors.parquet --device cpu
+```
+
+**Esperado**:
+- `mean cos ≥ 0.85` → PASS, steering loop viable.
+- `0.70 ≤ mean cos < 0.85` → MARGINAL, steering puede andar a ~50% como el paper.
+- `mean cos < 0.70` → FAIL, hay bug (injection_scale, embed_scale, layer mismatch). Cazarlo antes de gastar A100.
+
+En A100 80GB usá `--device cuda` (~10× más rápido).
+
 ## Variables de entorno
 
 | var | default | uso |
