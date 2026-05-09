@@ -21,9 +21,10 @@ import os
 from contextlib import asynccontextmanager
 from typing import Literal, Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from nla_judge import (
     FLAG_THRESHOLD,
@@ -50,6 +51,13 @@ def _build_judge() -> Judge:
     if JUDGE_BACKEND == "regex":
         return RegexJudge()
     if JUDGE_BACKEND == "claude":
+        # Fail fast on missing key — anthropic SDK validates lazily, so
+        # without this the service would silently boot and 500 on first call.
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            raise RuntimeError(
+                "JUDGE_BACKEND=claude but ANTHROPIC_API_KEY is not set. "
+                "Set it in the Railway dashboard (or your shell) and restart."
+            )
         return ClaudeJudge(model=JUDGE_MODEL, flag_threshold=THRESHOLD)
     raise ValueError(
         f"unknown JUDGE_BACKEND={JUDGE_BACKEND!r}; expected 'claude' or 'regex'"
@@ -86,6 +94,39 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=False,
 )
+
+
+# Translate Anthropic API failures into 502s with a structured body, so the
+# orchestrator can distinguish "judge backend broken" from "service buggy".
+try:
+    import anthropic as _anthropic
+except ImportError:
+    _anthropic = None
+
+
+if _anthropic is not None:
+    @app.exception_handler(_anthropic.APIStatusError)
+    async def _anthropic_status_handler(request: Request, exc):
+        return JSONResponse(
+            status_code=502,
+            content={
+                "detail": "judge backend error",
+                "type": type(exc).__name__,
+                "status": getattr(exc, "status_code", None),
+                "message": str(exc)[:300],
+            },
+        )
+
+    @app.exception_handler(_anthropic.APIConnectionError)
+    async def _anthropic_conn_handler(request: Request, exc):
+        return JSONResponse(
+            status_code=502,
+            content={
+                "detail": "judge backend unreachable",
+                "type": type(exc).__name__,
+                "message": str(exc)[:300],
+            },
+        )
 
 
 @app.get("/healthz", response_model=HealthResponse)
