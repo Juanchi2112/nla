@@ -6,4 +6,5 @@ orjson
 pyyaml
 numpy<2.0
 huggingface-hub
+pyarrow
 sglang[all]>=0.5.6

@@ -42,6 +42,34 @@ bash scripts/smoke_test.sh
 Genera 1 explicación con un vector random.
 **Si la salida es inglés → OK**. Si es CJK / chino → algo falló (ver `README.md` § Debugging).
 
+## Pipeline end-to-end (Qwen base → NLA)
+
+El smoke test usa un vector random. Para probar con activations **reales** del residual stream de Qwen, hace falta correr Qwen base, extraer activations, y mandárselas al NLA actor. En una sola GPU de 24 GB esto se hace **secuencialmente** porque ambos modelos no entran simultáneos.
+
+**Flujo**:
+
+1. **Apagar SGLang** si está corriendo (`Ctrl+C`). Verificar VRAM libre con `nvidia-smi`.
+
+2. **Extraer activations** (carga Qwen base, descarga ~15 GB la primera vez):
+   ```bash
+   python scripts/extract_activations.py --output vectors.parquet
+   ```
+   El script libera la VRAM al terminar.
+
+3. **Re-levantar SGLang** con el NLA actor (terminal 1):
+   ```bash
+   bash scripts/launch_sglang.sh
+   ```
+
+4. **Decodificar las activations extraídas** (terminal 2):
+   ```bash
+   python nla_inference.py ./actor_hf --parquet vectors.parquet --n 20
+   ```
+
+**Criterio de validación cualitativa**: las decodificaciones deberían describir conceptos relacionados con el contexto del token. Ej. en `"The capital of France is Paris..."`, la posición de `Paris` debería decodificar a algo sobre ciudades / Francia / geografía europea, no a CJK ni a algo sin relación.
+
+**Textos de prueba**: están hardcoded en `scripts/extract_activations.py` (`TEST_TEXTS`). Editá ese list para probar con otros textos.
+
 ## Variables de entorno
 
 | var | default | uso |
