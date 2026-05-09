@@ -8,9 +8,10 @@ Steering pipelines live on a separate branch and ship their own copy of
 these modules (extended with s_target/AR plumbing). This package is the
 monitoring-only slice: text in, structured verdict out, no activations.
 """
+
 from .judge import (
-    ClaudeJudge,
     FLAG_THRESHOLD,
+    ClaudeJudge,
     Judge,
     JudgeResult,
     MultiTokenJudge,

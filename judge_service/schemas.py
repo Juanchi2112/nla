@@ -1,7 +1,8 @@
 """Pydantic schemas for the judge service HTTP API."""
+
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -26,7 +27,7 @@ class JudgeRequest(BaseModel):
 
 class JudgeResponse(BaseModel):
     is_flagged: bool
-    fired_rubric: Optional[str] = Field(
+    fired_rubric: str | None = Field(
         None,
         description="Name of the rubric whose score crossed the threshold.",
     )
@@ -36,7 +37,7 @@ class JudgeResponse(BaseModel):
         le=3,
         description="0-3 score of the fired rubric (0 if no flag).",
     )
-    evidence: Optional[str] = Field(
+    evidence: str | None = Field(
         None,
         description="Short quote from the input justifying the flag.",
     )

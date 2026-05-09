@@ -2,6 +2,9 @@
 
 Pasos para levantar este repo en una VM con GPU.
 
+> Para desarrollo local de los servicios sin GPU (judge + orchestrator + frontend),
+> ver § "Desarrollo local" más abajo.
+
 ## Requisitos
 
 - GPU NVIDIA con ≥ 16 GB VRAM (L4 24GB, A10 24GB, RTX 4090, A100 — todas funcionan)
@@ -86,3 +89,94 @@ Ej: `MODEL_DIR=/data/qwen bash scripts/setup.sh`
 ## Otros modelos
 
 Gemma-3 / Llama-3.3 son **gated** en HF (necesitan `HF_TOKEN`) y Gemma además requiere un parche custom en SGLang. Ver `README.md` § Model-specific parameters. Los scripts acá están calibrados para Qwen — para otros modelos hay que ajustar más cosas.
+
+---
+
+## Desarrollo local (sin GPU)
+
+Para correr el stack monitoring (judge + orchestrator + frontend) sin GPU.
+Útil para desarrollo del backend, validar UI, escribir tests.
+
+### Setup (una vez)
+
+```bash
+# Instalar uv si no lo tenés
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clonar y crear venv
+git clone <tu-repo-url> nla
+cd nla
+uv venv --python 3.11
+uv sync --extra dev
+```
+
+`uv sync --extra dev` instala las deps de runtime (FastAPI, etc.) + las de desarrollo
+(pytest, ruff). Para deploy de Docker, ver los `Dockerfile` de cada servicio
+(usan `requirements.txt` directamente, sin uv).
+
+### Correr los servicios
+
+3 terminales:
+
+```bash
+# Terminal 1 — judge service
+PYTHONPATH=. JUDGE_BACKEND=regex uv run uvicorn judge_service.app:app --port 8002
+
+# Terminal 2 — orchestrator
+PYTHONPATH=. JUDGE_URL=http://localhost:8002 ORCHESTRATOR_GPU=mock \
+  uv run uvicorn orchestrator.app:app --port 8001
+
+# Terminal 3 — frontend
+cd "NLA frontend"
+NEXT_PUBLIC_ORCHESTRATOR_URL=http://localhost:8001 npm run dev
+```
+
+Abrí `http://localhost:3000`.
+
+### Tests
+
+```bash
+# Linter + formatter
+uv run ruff check .
+uv run ruff format --check .
+
+# Test suite (51 tests, ~6s)
+PYTHONPATH=. uv run pytest
+
+# Solo unit tests (rápidos)
+PYTHONPATH=. uv run pytest tests/test_judge.py
+```
+
+CI (`.github/workflows/ci.yml`) corre los 3 chequeos automáticamente en cada PR
+y push a `main`.
+
+### Estructura
+
+```
+nla/
+├── nla_judge/              # lib compartida — Judge ABC, RegexJudge, ClaudeJudge, rubrics
+├── judge_service/          # FastAPI HTTP wrapper sobre nla_judge
+├── orchestrator/           # FastAPI con SSE — orquesta GPU + judge para el frontend
+├── NLA frontend/           # Next.js 16 dashboard
+├── server.py               # GPU-side FastAPI (ejecutar SOLO en la VM con GPU)
+├── nla_inference.py        # Cliente NLA upstream — NO MODIFICAR
+├── scripts/                # Setup + extract_activations + decode_parquet (GPU side)
+├── tests/                  # pytest tests del judge + orchestrator
+└── pyproject.toml          # config central: deps, ruff, pytest
+```
+
+### Switch a GPU real (cuando esté listo)
+
+Cuando la GPU esté arriba en vast.ai (port 44016 por convención), cambiar el orchestrator:
+
+```bash
+PYTHONPATH=. \
+  ORCHESTRATOR_GPU=decoder \
+  GPU_URL=http://<gpu-ip>:44016 \
+  GPU_SKIP_FIRST=5 \
+  JUDGE_URL=http://localhost:8002 \
+  uv run uvicorn orchestrator.app:app --port 8001
+```
+
+El frontend no necesita cambios — los `nla_trace` events ahora vienen de decodes
+reales del NLA en lugar de monólogos canned.

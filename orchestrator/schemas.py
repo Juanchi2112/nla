@@ -1,7 +1,8 @@
 """Pydantic schemas for the orchestrator HTTP and SSE surface."""
+
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -9,6 +10,7 @@ Mode = Literal["A", "B"]
 
 
 # ─── HTTP request/response ─────────────────────────────────────────────────
+
 
 class GenerateRequest(BaseModel):
     session_id: str = Field(
@@ -18,7 +20,7 @@ class GenerateRequest(BaseModel):
         max_length=128,
     )
     prompt: str = Field(..., min_length=1, max_length=4000)
-    model: Optional[str] = Field(
+    model: str | None = Field(
         None,
         description="Hint for the GPU side. Ignored by the mock backend.",
     )
@@ -58,6 +60,7 @@ class CancelResponse(BaseModel):
 # ─── SSE event payloads ────────────────────────────────────────────────────
 # These are what's serialized into the `data:` line of each SSE frame.
 
+
 class TokenEvent(BaseModel):
     type: Literal["token"] = "token"
     step: int
@@ -66,10 +69,11 @@ class TokenEvent(BaseModel):
 
 class JudgeVerdict(BaseModel):
     """Mirrors the judge service's POST /judge response."""
+
     is_flagged: bool
-    fired_rubric: Optional[str] = None
+    fired_rubric: str | None = None
     severity: int = 0
-    evidence: Optional[str] = None
+    evidence: str | None = None
     scores: dict[str, int] = Field(default_factory=dict)
 
 
@@ -78,7 +82,7 @@ class NLATraceEvent(BaseModel):
     step: int
     mode: Mode
     monologue: str
-    verdict: Optional[JudgeVerdict] = Field(
+    verdict: JudgeVerdict | None = Field(
         None,
         description="None when the judge service was unreachable.",
     )
@@ -86,6 +90,7 @@ class NLATraceEvent(BaseModel):
 
 class SteerAppliedEvent(BaseModel):
     """Emitted when an active steer is consumed by the generator."""
+
     type: Literal["steer_applied"] = "steer_applied"
     step: int
     rubric: str
@@ -95,7 +100,7 @@ class SteerAppliedEvent(BaseModel):
 class ErrorEvent(BaseModel):
     type: Literal["error"] = "error"
     detail: str
-    step: Optional[int] = None
+    step: int | None = None
 
 
 class DoneEvent(BaseModel):
@@ -104,10 +109,4 @@ class DoneEvent(BaseModel):
     reason: Literal["completed", "cancelled"] = "completed"
 
 
-SSEPayload = (
-    TokenEvent
-    | NLATraceEvent
-    | SteerAppliedEvent
-    | ErrorEvent
-    | DoneEvent
-)
+SSEPayload = TokenEvent | NLATraceEvent | SteerAppliedEvent | ErrorEvent | DoneEvent

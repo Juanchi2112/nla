@@ -28,12 +28,13 @@ When ORCHESTRATOR_GPU=decoder is set, this client refuses to start
 without an explicit GPU_URL — there is no silent fallback to a default
 host so deploys can't accidentally point at the wrong box.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 from collections.abc import AsyncIterator
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -78,7 +79,7 @@ class DecoderEndpointClient(GPUClient):
         self._skip_first = skip_first
         self._av_max_new_tokens = av_max_new_tokens
         self._av_temperature = av_temperature
-        self._http: Optional[httpx.AsyncClient] = None
+        self._http: httpx.AsyncClient | None = None
 
     async def _ensure_http(self) -> httpx.AsyncClient:
         if self._http is None:
@@ -98,7 +99,7 @@ class DecoderEndpointClient(GPUClient):
         prompt: str,
         *,
         sniff_every_k: int,
-        max_new_tokens: int,                 # ignored: /decode does not generate
+        max_new_tokens: int,  # ignored: /decode does not generate
     ) -> AsyncIterator[GPUStreamItem]:
         http = await self._ensure_http()
         body = {
@@ -114,8 +115,7 @@ class DecoderEndpointClient(GPUClient):
             payload: dict[str, Any] = r.json()
         except httpx.HTTPStatusError as e:
             raise GPUClientError(
-                f"GPU /decode HTTP {e.response.status_code}: "
-                f"{e.response.text[:200]}"
+                f"GPU /decode HTTP {e.response.status_code}: {e.response.text[:200]}"
             ) from e
         except (httpx.HTTPError, ValueError) as e:
             raise GPUClientError(f"GPU /decode transport error: {e}") from e
@@ -147,4 +147,4 @@ class DecoderEndpointClient(GPUClient):
         cur = rows[i].get("context") or ""
         prev = rows[i - 1].get("context") if i > 0 else ""
         prev = prev or ""
-        return cur[len(prev):] if cur.startswith(prev) else cur
+        return cur[len(prev) :] if cur.startswith(prev) else cur

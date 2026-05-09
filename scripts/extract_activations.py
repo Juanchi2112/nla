@@ -16,6 +16,7 @@ Designed for a sequential workflow on a single 24 GB GPU (e.g. RTX 4090):
 Hook pattern verified against upstream:
     natural_language_autoencoders/nla/datagen/extractors.py:70-159
 """
+
 from __future__ import annotations
 
 import argparse
@@ -37,19 +38,21 @@ TEST_TEXTS: list[str] = [
 ]
 
 MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
-LAYER_INDEX = 20      # 0-indexed: hooks model.model.layers[20], captures post-block-20 residual
-D_MODEL = 3584        # Qwen 7B hidden size
-SKIP_FIRST = 10       # README rule: first ~10 positions decode poorly (low context accumulation)
+LAYER_INDEX = 20  # 0-indexed: hooks model.model.layers[20], captures post-block-20 residual
+D_MODEL = 3584  # Qwen 7B hidden size
+SKIP_FIRST = 10  # README rule: first ~10 positions decode poorly (low context accumulation)
 
 
 def schema(d_model: int) -> pa.Schema:
-    return pa.schema([
-        ("n_raw_tokens", pa.int64()),
-        ("detokenized_text_truncated", pa.string()),
-        ("activation_vector", pa.list_(pa.float32(), d_model)),
-        ("activation_layer", pa.int64()),
-        ("doc_id", pa.string()),
-    ])
+    return pa.schema(
+        [
+            ("n_raw_tokens", pa.int64()),
+            ("detokenized_text_truncated", pa.string()),
+            ("activation_vector", pa.list_(pa.float32(), d_model)),
+            ("activation_layer", pa.int64()),
+            ("doc_id", pa.string()),
+        ]
+    )
 
 
 def extract(texts: list[str], skip_first: int) -> list[dict]:
@@ -74,28 +77,34 @@ def extract(texts: list[str], skip_first: int) -> list[dict]:
     try:
         for doc_idx, text in enumerate(texts):
             captured.clear()
-            ids = tokenizer(text, return_tensors="pt", add_special_tokens=True)["input_ids"].to(device)
+            ids = tokenizer(text, return_tensors="pt", add_special_tokens=True)["input_ids"].to(
+                device
+            )
 
             with torch.no_grad():
                 model(input_ids=ids, use_cache=False)
 
             assert len(captured) == 1, f"hook fired {len(captured)} times for doc {doc_idx}"
-            hidden = captured[0].float().cpu()[0]   # [T, d_model], fp32 on host
+            hidden = captured[0].float().cpu()[0]  # [T, d_model], fp32 on host
             token_ids = ids[0].cpu().tolist()
 
             kept = 0
             for pos in range(skip_first, len(token_ids)):
-                rows.append({
-                    "n_raw_tokens": pos + 1,
-                    "detokenized_text_truncated": tokenizer.decode(
-                        token_ids[: pos + 1], skip_special_tokens=True
-                    ),
-                    "activation_vector": hidden[pos].numpy().tolist(),
-                    "activation_layer": LAYER_INDEX,
-                    "doc_id": f"test_text_{doc_idx}",
-                })
+                rows.append(
+                    {
+                        "n_raw_tokens": pos + 1,
+                        "detokenized_text_truncated": tokenizer.decode(
+                            token_ids[: pos + 1], skip_special_tokens=True
+                        ),
+                        "activation_vector": hidden[pos].numpy().tolist(),
+                        "activation_layer": LAYER_INDEX,
+                        "doc_id": f"test_text_{doc_idx}",
+                    }
+                )
                 kept += 1
-            print(f"  [{doc_idx}] {len(token_ids)} tokens, kept {kept} (skipped first {skip_first})")
+            print(
+                f"  [{doc_idx}] {len(token_ids)} tokens, kept {kept} (skipped first {skip_first})"
+            )
     finally:
         handle.remove()
 
@@ -111,8 +120,12 @@ def extract(texts: list[str], skip_first: int) -> list[dict]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--output", default="vectors.parquet")
-    ap.add_argument("--skip-first", type=int, default=SKIP_FIRST,
-                    help="Skip first N positions per text (default: %(default)s — README rule)")
+    ap.add_argument(
+        "--skip-first",
+        type=int,
+        default=SKIP_FIRST,
+        help="Skip first N positions per text (default: %(default)s — README rule)",
+    )
     args = ap.parse_args()
 
     rows = extract(TEST_TEXTS, args.skip_first)
