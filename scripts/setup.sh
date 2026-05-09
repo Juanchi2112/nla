@@ -29,7 +29,7 @@ pip install -r requirements.txt
 
 if [ ! -d "$MODEL_DIR" ]; then
     echo "[setup] Downloading $MODEL_REPO -> $MODEL_DIR (~15 GB, takes a few minutes)"
-    huggingface-cli download "$MODEL_REPO" --local-dir "$MODEL_DIR"
+    hf download "$MODEL_REPO" --local-dir "$MODEL_DIR"
 else
     echo "[setup] $MODEL_DIR already exists, skipping download"
 fi
