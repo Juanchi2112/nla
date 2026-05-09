@@ -1,0 +1,256 @@
+.container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #0d1117;
+  color: #c9d1d9;
+}
+
+.leftPanel, .rightPanel {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+  border-right: 1px solid #30363d;
+}
+
+.rightPanel {
+  border-right: none;
+  background-color: #161b22;
+}
+
+.h2 {
+  font-size: 1.2rem;
+  margin-bottom: 1.5rem;
+  color: #58a6ff;
+  border-bottom: 1px solid #30363d;
+  padding-bottom: 0.5rem;
+}
+
+.chatBox {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.prompt {
+  background-color: #21262d;
+  padding: 1rem;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  border-left: 4px solid #8b949e;
+}
+
+.response {
+  padding: 1rem;
+  line-height: 1.6;
+}
+
+.token {
+  display: inline-block;
+  padding: 0 1px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.token:hover, .token.active {
+  background-color: rgba(88, 166, 255, 0.2);
+}
+
+.warningBanner {
+  background-color: rgba(215, 58, 73, 0.2);
+  color: #f85149;
+  padding: 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  border: 1px solid #d73a49;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+.controls {
+  margin-top: 2rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.btn {
+  background-color: #238636;
+  color: #ffffff;
+  border: 1px solid rgba(240, 246, 252, 0.1);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn:hover {
+  background-color: #2ea043;
+}
+
+.btn:disabled {
+  background-color: #21262d;
+  color: #8b949e;
+  cursor: not-allowed;
+}
+
+.btnSteer {
+  background-color: #d73a49;
+}
+
+.btnSteer:hover {
+  background-color: #cb2431;
+}
+
+/* Right Panel Styles */
+.scenarioBox {
+  background-color: #1c2128;
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid #444c56;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #adbac7;
+}
+
+.matrixContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.matrixEmpty {
+  color: #8b949e;
+  font-style: italic;
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.traceCard {
+  background-color: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 1.5rem;
+}
+
+.traceHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #21262d;
+}
+
+.traceCategory {
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+}
+
+.traceCategory.danger {
+  color: #ff7b72;
+}
+
+.traceCategory.warning {
+  color: #d2a8ff;
+}
+
+.traceCategory.neutral {
+  color: #8b949e;
+}
+
+.scoreBadge {
+  font-family: monospace;
+  background: #21262d;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.monologueLabel {
+  color: #8b949e;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.monologueText {
+  font-style: italic;
+  color: #c9d1d9;
+  line-height: 1.5;
+  padding: 1rem;
+  background-color: rgba(33, 38, 45, 0.5);
+  border-left: 3px solid #58a6ff;
+  border-radius: 0 4px 4px 0;
+}
+
+.steeringContext {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: #ff7b72;
+  font-style: italic;
+  border-left: 4px solid #ff7b72;
+  padding-left: 1rem;
+}
+
+.promptInput {
+  width: 100%;
+  background-color: #21262d;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.promptInput:focus {
+  outline: none;
+  border-color: #58a6ff;
+}
+
+.promptInput:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.layerBarContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.layerLabel {
+  font-size: 0.85rem;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.progressBarTrack {
+  height: 8px;
+  background-color: #21262d;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progressBarFill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
