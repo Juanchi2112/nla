@@ -38,7 +38,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from nla_inference import NLAClient, NLACritic
+from gpu.nla_inference import NLAClient, NLACritic
 
 QWEN_BASE_MODEL = os.environ.get("QWEN_BASE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 QWEN_LAYER_INDEX = int(os.environ.get("QWEN_LAYER_INDEX", "20"))

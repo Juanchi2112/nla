@@ -1,12 +1,13 @@
 [project]
 name = "nla"
 version = "0.1.0"
-description = "Natural Language Autoencoder monitoring stack — judge service, orchestrator, and shared lib."
+description = "Natural Language Autoencoder monitoring stack — backend (orchestrator + in-process judge), GPU server, and frontend."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 
-# Core runtime: shared by judge_service + orchestrator (cloud deployable, no GPU).
+# Core runtime: backend service (Railway). Includes anthropic for the
+# in-process ClaudeJudge — no separate judge_service deploy anymore.
 dependencies = [
     "fastapi>=0.115,<0.140",
     "uvicorn[standard]>=0.30,<0.35",
@@ -16,8 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# GPU-side stack: server.py, scripts/extract_activations.py, scripts/decode_parquet.py.
-# These run on the vast.ai box, NOT on Railway/Vercel.
+# GPU-side stack: gpu/server.py + gpu/scripts/*. Runs on vast.ai, NOT Railway.
 gpu = [
     "torch",
     "transformers<5",
@@ -43,9 +43,9 @@ dev = [
 target-version = "py311"
 line-length = 100
 extend-exclude = [
-    "nla_inference.py",  # vendored from kitft/nla-inference, leave intact (CLAUDE.md §9 rule 4)
-    "NLA frontend",      # JS/TS, not Python
-    "examples",          # transcript files
+    "gpu/nla_inference.py",  # vendored from kitft/nla-inference, leave intact (CLAUDE.md §9 rule 4)
+    "frontend",              # JS/TS, not Python
+    "gpu/examples",          # transcript files
     ".venv",
 ]
 
@@ -70,7 +70,7 @@ ignore = [
 "tests/*" = [
     "S101",  # asserts allowed in tests
 ]
-"scripts/*" = [
+"gpu/scripts/*" = [
     "T201",  # print statements allowed in CLI scripts
 ]
 

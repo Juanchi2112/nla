@@ -1,34 +1,51 @@
-# NLA Orchestrator
+# NLA Backend
 
-FastAPI service that ties the frontend to the rest of the stack:
+FastAPI service that orchestrates the frontend, the GPU /decode endpoint,
+and the in-process judge. The former `judge_service/` deploy was folded
+in here as part of the monolith refactor.
 
 ```
-frontend ──HTTP/SSE──► orchestrator ──HTTP──► judge_service (Anthropic)
-                              │
-                              └────HTTP──► GPU /decode  (server.py)
-                                           live: 193.222.57.16:44016
+frontend ──HTTP/SSE──► backend ──HTTP──► GPU /decode  (gpu/server.py)
+                          │              live: 193.222.57.16:44016
+                          │
+                          └─ in-process: backend.judge.* (regex | claude)
+                                         (uses ANTHROPIC_API_KEY when claude)
 ```
 
-This PR ships the orchestrator with two backends:
+The backend ships with two GPU adapters:
 - **`mock`** (default) — canned tokens and curated monologues so the
   whole pipeline can run without a GPU.
-- **`decoder`** — calls the GPU's `/decode` endpoint (`server.py`,
+- **`decoder`** — calls the GPU's `/decode` endpoint (`gpu/server.py`,
   currently live at `http://193.222.57.16:44016`). Refuses to start
   unless `GPU_URL` is set to a real address.
 
 **`/decode` analyses an existing text — it does not generate new tokens.**
 For each residual-stream position past `skip_first`, the GPU returns
-the AV's monologue (`decode`) and metadata. The orchestrator replays
-those rows on a small timer to fit the streaming contract; the
-"tokens" we emit are the new chunks of `context` between consecutive
-rows, not anything the model produced. To analyse a model output,
-paste the output as the `prompt`.
+the AV's monologue (`decode`) and metadata. The backend replays those
+rows on a small timer to fit the streaming contract; the "tokens" we
+emit are the new chunks of `context` between consecutive rows, not
+anything the model produced. To analyse a model output, paste the
+output as the `prompt`.
 
 Active steering (Δ injection) is **out of scope here**. `/api/steer`
 records the rubric on the session and the mock generator switches to
 compliant monologues so the demo shows the judge going green — but the
-GPU side is not asked to change anything yet. Real steering lands in
-the follow-up PR.
+GPU side is not asked to change anything yet. Real steering lands on
+`feat/steering-loop`.
+
+## Judge backend
+
+Selected at startup via `JUDGE_BACKEND`:
+
+| backend  | what it does                                             | requires             |
+|----------|----------------------------------------------------------|----------------------|
+| `regex`  | Keyword matching from `backend.judge.RegexJudge`         | nothing — default    |
+| `claude` | Claude Haiku 4.5 with rubric prompt, structured 0-3 score | `ANTHROPIC_API_KEY`  |
+
+The judge runs in-process (`backend.judge_runner.JudgeRunner`) — no
+HTTP hop, no `JUDGE_URL` to coordinate. Anthropic API errors are
+swallowed and surfaced as `verdict: null` on the SSE stream so the
+session continues.
 
 ## API
 
@@ -52,7 +69,7 @@ Frames:
 | event       | data                                                       |
 |-------------|------------------------------------------------------------|
 | `token`     | `{ step, text }`                                           |
-| `nla_trace` | `{ step, mode, monologue, verdict }` (verdict = JudgeResult or null) |
+| `nla_trace` | `{ step, mode, monologue, verdict }` (verdict = JudgeVerdict or null) |
 | `steer_applied` | `{ step, rubric, intensity }`                          |
 | `error`     | `{ detail, step? }`                                        |
 | `done`      | `{ total_tokens, reason: "completed" \| "cancelled" }`     |
@@ -83,8 +100,8 @@ Sets `stop_requested`. The generator notices on its next loop, emits a
   "gpu_url_set": true,
   "gpu_url": "http://193.222.57.16:44016",
   "gpu_skip_first": 10,
-  "judge_url": "http://localhost:8000",
-  "judge_reachable": true,
+  "judge_backend": "claude",
+  "judge_model": "claude-haiku-4-5",
   "max_new_tokens": 128
 }
 ```
@@ -92,16 +109,11 @@ Sets `stop_requested`. The generator notices on its next loop, emits a
 ## Local
 
 ```bash
-# Terminal 1 — judge service (this repo, judge_service/)
-JUDGE_BACKEND=regex \
-  uvicorn judge_service.app:app --port 8000
+# Terminal 1 — backend (with regex judge for zero-secrets dev)
+PYTHONPATH=. JUDGE_BACKEND=regex ORCHESTRATOR_GPU=mock \
+  uv run uvicorn backend.app:app --port 8001
 
-# Terminal 2 — orchestrator
-JUDGE_URL=http://localhost:8000 \
-ORCHESTRATOR_GPU=mock \
-  uvicorn orchestrator.app:app --port 8001
-
-# Terminal 3 — drive it
+# Terminal 2 — drive it
 SESSION=$(python -c "import uuid; print(uuid.uuid4())")
 curl -s -X POST http://localhost:8001/api/generate \
   -H 'content-type: application/json' \
@@ -120,20 +132,19 @@ curl -X POST http://193.222.57.16:44016/decode \
   -d '{"text":"The capital of France is Paris.","skip_first":5}'
 ```
 
-To run the orchestrator against it:
+To run the backend against it:
 
 ```bash
+PYTHONPATH=. \
 ORCHESTRATOR_GPU=decoder \
 GPU_URL=http://193.222.57.16:44016 \
 GPU_SKIP_FIRST=10 \
-JUDGE_URL=http://localhost:8000 \
-  uvicorn orchestrator.app:app --port 8001
+JUDGE_BACKEND=regex \
+  uv run uvicorn backend.app:app --port 8001
 ```
 
 For short test prompts, drop `GPU_SKIP_FIRST` low enough that the input
 has rows past it — e.g. `GPU_SKIP_FIRST=2` for the 7-token Paris example.
-If the input is too short, the orchestrator emits an `error` SSE frame
-naming the cause instead of an empty stream.
 
 If `GPU_URL` is left as the default `__TBD__` placeholder, the service
 fails to start with a clear message instead of accepting traffic and
@@ -146,12 +157,13 @@ Point a service at this repo and Railway picks up
 
 | var                | required                          | default                       |
 |--------------------|-----------------------------------|-------------------------------|
-| `JUDGE_URL`        | yes (point at the judge service)  | `http://localhost:8000`       |
+| `JUDGE_BACKEND`    | no                                | `regex`                       |
+| `ANTHROPIC_API_KEY`| when `JUDGE_BACKEND=claude`       | —                             |
+| `JUDGE_MODEL`      | no                                | `claude-haiku-4-5`            |
 | `ORCHESTRATOR_GPU` | no                                | `mock`                        |
 | `GPU_URL`          | when `ORCHESTRATOR_GPU=decoder`   | `__TBD__`                     |
 | `GPU_SKIP_FIRST`   | no                                | `10` (rows skipped from start)|
 | `GPU_TIMEOUT`      | no                                | `120.0` seconds               |
-| `JUDGE_TIMEOUT`    | no                                | `5.0` seconds                 |
 | `MAX_NEW_TOKENS`   | no                                | `128`                         |
 | `CORS_ORIGINS`     | no                                | `*`                           |
 | `PORT`             | set automatically                 | —                             |

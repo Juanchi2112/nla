@@ -2,10 +2,10 @@
 
 Pasos para levantar este repo en una VM con GPU.
 
-> Para desarrollo local de los servicios sin GPU (judge + orchestrator + frontend),
-> ver § "Desarrollo local" más abajo.
+> Para desarrollo local del backend + frontend (sin GPU), ver § "Desarrollo local"
+> más abajo.
 
-## Requisitos
+## Requisitos (GPU box)
 
 - GPU NVIDIA con ≥ 16 GB VRAM (L4 24GB, A10 24GB, RTX 4090, A100 — todas funcionan)
 - Driver NVIDIA ≥ 535, CUDA 12.1+
@@ -13,7 +13,7 @@ Pasos para levantar este repo en una VM con GPU.
 - Python 3.11
 - ~40 GB de disco libre (15 GB pesos + venv + caches HF)
 
-## Pasos
+## Pasos (GPU box)
 
 **1. Clonar el repo en la VM**
 
@@ -22,16 +22,18 @@ git clone <tu-repo-url> nla
 cd nla
 ```
 
-**2. Setup** (venv + deps + descarga de pesos)
+**2. Setup** (uv + venv + deps GPU + descarga de pesos)
 
 ```bash
-bash scripts/setup.sh
+bash gpu/scripts/setup.sh
 ```
+
+El script auto-instala uv si falta y corre `uv sync --extra gpu`.
 
 **3. Levantar SGLang** (terminal 1)
 
 ```bash
-bash scripts/launch_sglang.sh
+bash gpu/scripts/launch_sglang.sh
 ```
 
 Esperá a ver `The server is fired up and ready to roll!` antes de seguir.
@@ -39,7 +41,7 @@ Esperá a ver `The server is fired up and ready to roll!` antes de seguir.
 **4. Smoke test** (terminal 2)
 
 ```bash
-bash scripts/smoke_test.sh
+bash gpu/scripts/smoke_test.sh
 ```
 
 Genera 1 explicación con un vector random.
@@ -55,46 +57,55 @@ El smoke test usa un vector random. Para probar con activations **reales** del r
 
 2. **Extraer activations** (carga Qwen base, descarga ~15 GB la primera vez):
    ```bash
-   python scripts/extract_activations.py --output vectors.parquet
+   uv run python gpu/scripts/extract_activations.py --output vectors.parquet
    ```
    El script libera la VRAM al terminar.
 
 3. **Re-levantar SGLang** con el NLA actor (terminal 1):
    ```bash
-   bash scripts/launch_sglang.sh
+   bash gpu/scripts/launch_sglang.sh
    ```
 
 4. **Decodificar las activations extraídas** (terminal 2):
    ```bash
-   python nla_inference.py ./actor_hf --parquet vectors.parquet --n 20
+   uv run python gpu/nla_inference.py ./actor_hf --parquet vectors.parquet --n 20
    ```
 
 **Criterio de validación cualitativa**: las decodificaciones deberían describir conceptos relacionados con el contexto del token. Ej. en `"The capital of France is Paris..."`, la posición de `Paris` debería decodificar a algo sobre ciudades / Francia / geografía europea, no a CJK ni a algo sin relación.
 
-**Textos de prueba**: están hardcoded en `scripts/extract_activations.py` (`TEST_TEXTS`). Editá ese list para probar con otros textos.
+**Textos de prueba**: están hardcoded en `gpu/scripts/extract_activations.py` (`TEST_TEXTS`). Editá ese list para probar con otros textos.
 
-## Variables de entorno
+## Levantar el GPU FastAPI server (`gpu/server.py`)
+
+Para que el backend (Railway) se conecte vía `/decode`, hay que levantar el FastAPI del lado GPU:
+
+```bash
+# Después de setup + SGLang corriendo
+uv run uvicorn gpu.server:app --host 0.0.0.0 --port 44016
+```
+
+El backend usa `ORCHESTRATOR_GPU=decoder` y `GPU_URL=http://<gpu-ip>:44016` para hablarle.
+
+## Variables de entorno (GPU)
 
 | var | default | uso |
 |---|---|---|
-| `PYTHON_BIN` | `python3.11` | binario de python para el venv |
 | `MODEL_REPO` | `kitft/nla-qwen2.5-7b-L20-av` | repo HF con los pesos |
 | `MODEL_DIR` | `./actor_hf` | dónde se descargan los pesos |
-| `VENV_DIR` | `.venv` | venv path |
-| `PORT` | `30000` | puerto SGLang |
-| `MEM_FRAC` | `0.85` | `--mem-fraction-static` |
+| `PORT` | `30000` (SGLang) / `44016` (server.py) | — |
+| `MEM_FRAC` | `0.85` | `--mem-fraction-static` de SGLang |
 
-Ej: `MODEL_DIR=/data/qwen bash scripts/setup.sh`
+Ej: `MODEL_DIR=/data/qwen bash gpu/scripts/setup.sh`
 
 ## Otros modelos
 
-Gemma-3 / Llama-3.3 son **gated** en HF (necesitan `HF_TOKEN`) y Gemma además requiere un parche custom en SGLang. Ver `README.md` § Model-specific parameters. Los scripts acá están calibrados para Qwen — para otros modelos hay que ajustar más cosas.
+Gemma-3 / Llama-3.3 son **gated** en HF (necesitan `HF_TOKEN`) y Gemma además requiere un parche custom en SGLang. Ver `README.md` § Model-specific parameters. Los scripts están calibrados para Qwen — para otros modelos hay que ajustar más cosas.
 
 ---
 
 ## Desarrollo local (sin GPU)
 
-Para correr el stack monitoring (judge + orchestrator + frontend) sin GPU.
+Para correr el stack monitoring (backend + frontend) sin GPU.
 Útil para desarrollo del backend, validar UI, escribir tests.
 
 ### Setup (una vez)
@@ -110,28 +121,31 @@ uv venv --python 3.11
 uv sync --extra dev
 ```
 
-`uv sync --extra dev` instala las deps de runtime (FastAPI, etc.) + las de desarrollo
-(pytest, ruff). Para deploy de Docker, ver los `Dockerfile` de cada servicio
-(usan `requirements.txt` directamente, sin uv).
+`uv sync --extra dev` instala las deps de runtime (FastAPI, anthropic) + las de
+desarrollo (pytest, ruff). El Dockerfile del backend usa `uv sync --frozen --no-dev`
+durante el build de Railway.
 
 ### Correr los servicios
 
-3 terminales:
+2 terminales (judge ya corre in-process en el backend):
 
 ```bash
-# Terminal 1 — judge service
-PYTHONPATH=. JUDGE_BACKEND=regex uv run uvicorn judge_service.app:app --port 8002
+# Terminal 1 — backend (orchestrator + judge in-process)
+PYTHONPATH=. JUDGE_BACKEND=regex ORCHESTRATOR_GPU=mock \
+  uv run uvicorn backend.app:app --port 8001
 
-# Terminal 2 — orchestrator
-PYTHONPATH=. JUDGE_URL=http://localhost:8002 ORCHESTRATOR_GPU=mock \
-  uv run uvicorn orchestrator.app:app --port 8001
-
-# Terminal 3 — frontend
-cd "NLA frontend"
+# Terminal 2 — frontend
+cd frontend
 NEXT_PUBLIC_ORCHESTRATOR_URL=http://localhost:8001 npm run dev
 ```
 
 Abrí `http://localhost:3000`.
+
+Para usar Claude como judge en lugar de regex:
+```bash
+ANTHROPIC_API_KEY=sk-ant-... JUDGE_BACKEND=claude ORCHESTRATOR_GPU=mock \
+  uv run uvicorn backend.app:app --port 8001
+```
 
 ### Tests
 
@@ -140,10 +154,10 @@ Abrí `http://localhost:3000`.
 uv run ruff check .
 uv run ruff format --check .
 
-# Test suite (51 tests, ~6s)
+# Test suite (38 tests, ~6s)
 PYTHONPATH=. uv run pytest
 
-# Solo unit tests (rápidos)
+# Solo unit tests del judge (más rápidos)
 PYTHONPATH=. uv run pytest tests/test_judge.py
 ```
 
@@ -154,28 +168,43 @@ y push a `main`.
 
 ```
 nla/
-├── nla_judge/              # lib compartida — Judge ABC, RegexJudge, ClaudeJudge, rubrics
-├── judge_service/          # FastAPI HTTP wrapper sobre nla_judge
-├── orchestrator/           # FastAPI con SSE — orquesta GPU + judge para el frontend
-├── NLA frontend/           # Next.js 16 dashboard
-├── server.py               # GPU-side FastAPI (ejecutar SOLO en la VM con GPU)
-├── nla_inference.py        # Cliente NLA upstream — NO MODIFICAR
-├── scripts/                # Setup + extract_activations + decode_parquet (GPU side)
-├── tests/                  # pytest tests del judge + orchestrator
-└── pyproject.toml          # config central: deps, ruff, pytest
+├── frontend/                   # Next.js 16 dashboard            → Vercel
+├── backend/                    # FastAPI (orchestrator + judge)  → Railway
+│   ├── app.py
+│   ├── judge/                  # in-process Judge lib
+│   │   ├── judge.py            #   RegexJudge, ClaudeJudge, MultiTokenJudge
+│   │   └── rubrics.py
+│   ├── judge_runner.py         # async wrapper around backend.judge
+│   ├── gpu/                    # HTTP client adapter (mock + decoder)
+│   ├── sessions.py
+│   ├── schemas.py
+│   ├── mock_generator.py
+│   ├── Dockerfile              # uv-based, no requirements.txt
+│   └── railway.toml
+├── gpu/                        # GPU-only code                    → vast.ai
+│   ├── server.py               # FastAPI /decode endpoint
+│   ├── nla_inference.py        # vendored from kitft — NO MODIFICAR
+│   ├── scripts/                # setup, launch_sglang, smoke_test, extract, decode
+│   └── examples/               # transcripts vendored
+├── tests/                      # pytest del backend + judge
+├── .github/workflows/ci.yml
+├── pyproject.toml              # única fuente de deps + ruff + pytest config
+├── uv.lock
+├── DEPLOY.md
+└── README.md
 ```
 
 ### Switch a GPU real (cuando esté listo)
 
-Cuando la GPU esté arriba en vast.ai (port 44016 por convención), cambiar el orchestrator:
+Cuando la GPU esté arriba (port 44016 por convención):
 
 ```bash
 PYTHONPATH=. \
   ORCHESTRATOR_GPU=decoder \
   GPU_URL=http://<gpu-ip>:44016 \
   GPU_SKIP_FIRST=5 \
-  JUDGE_URL=http://localhost:8002 \
-  uv run uvicorn orchestrator.app:app --port 8001
+  JUDGE_BACKEND=regex \
+  uv run uvicorn backend.app:app --port 8001
 ```
 
 El frontend no necesita cambios — los `nla_trace` events ahora vienen de decodes

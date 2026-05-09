@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+# Path: gpu/scripts/smoke_test.sh — go up two levels to repo root.
+cd "$(dirname "$0")/../.."
 
 MODEL_DIR="${MODEL_DIR:-./actor_hf}"
 SGLANG_URL="${SGLANG_URL:-http://localhost:30000}"
@@ -14,4 +15,4 @@ fi
 
 # Random unit vector. If output is English -> injection works.
 # If output is CJK / Chinese -> something failed (see README.md Debugging section).
-exec python nla_inference.py "$MODEL_DIR" --sglang-url "$SGLANG_URL"
+exec python gpu/nla_inference.py "$MODEL_DIR" --sglang-url "$SGLANG_URL"

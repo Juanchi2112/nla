@@ -1,15 +1,15 @@
-"""Unit tests for nla_judge: RegexJudge, MultiTokenJudge, rubrics.
+"""Unit tests for backend.judge: RegexJudge, MultiTokenJudge, rubrics.
 
 ClaudeJudge is NOT tested here — it requires ANTHROPIC_API_KEY and makes a
-network call. Cover that with manual tests against a deployed judge service
-or with vcr.py if we want it in CI.
+network call. Cover that with manual tests against the live backend or
+with vcr.py if we want it in CI.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from nla_judge import (
+from backend.judge import (
     RUBRICS,
     MultiTokenJudge,
     RegexJudge,
