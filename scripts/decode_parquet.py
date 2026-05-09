@@ -66,10 +66,28 @@ def main() -> None:
 
     print(f"\nDecoding {len(indices)} row(s) from {args.parquet}\n")
 
+    # Precompute the longest text per doc for the per-document header.
+    # The row with the highest n_raw_tokens for each doc has the full text.
+    full_text_per_doc: dict[str, str] = {}
+    for i in range(len(table)):
+        doc_id = table["doc_id"][i].as_py()
+        text = table["detokenized_text_truncated"][i].as_py()
+        if len(text) > len(full_text_per_doc.get(doc_id, "")):
+            full_text_per_doc[doc_id] = text
+
     prev_text_per_doc: dict[str, str] = {}
+    last_doc: str | None = None
 
     for out_i, row_i in enumerate(indices):
         doc = table["doc_id"][row_i].as_py()
+
+        if doc != last_doc:
+            # New document — print full-text header once before its rows.
+            print(f"═══ {doc} ═══")
+            print(f"TEXT: {full_text_per_doc[doc]!r}")
+            print()
+            last_doc = doc
+
         pos = table["n_raw_tokens"][row_i].as_py()
         text = table["detokenized_text_truncated"][row_i].as_py()
         v = np.array(table["activation_vector"][row_i].as_py(), dtype=np.float32)
@@ -85,7 +103,7 @@ def main() -> None:
             max_new_tokens=args.max_new_tokens,
         )
 
-        print(f"─── [{out_i}] doc={doc} pos={pos} ||v||={norm:.1f} ───")
+        print(f"─── [{out_i}] pos={pos} ||v||={norm:.1f} ───")
         print(f"  context: {ctx!r}")
         print(f"  decode:  {decode}")
         print()
