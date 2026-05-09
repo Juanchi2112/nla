@@ -15,6 +15,7 @@ Usage:
     python scripts/decode_parquet.py ./actor_hf vectors.parquet --n 10
     python scripts/decode_parquet.py ./actor_hf vectors.parquet --doc test_text_0
 """
+
 from __future__ import annotations
 
 import argparse
@@ -35,7 +36,7 @@ def format_context(prev_text: str, current_text: str) -> str:
     token the activation 'belongs to'."""
     if not prev_text:
         return f"[{current_text}]"
-    delta = current_text[len(prev_text):]
+    delta = current_text[len(prev_text) :]
     return f"{prev_text}[{delta}]"
 
 
@@ -44,10 +45,10 @@ def main() -> None:
     ap.add_argument("checkpoint", help="HF NLA actor dir (e.g. ./actor_hf)")
     ap.add_argument("parquet", help="parquet from scripts/extract_activations.py")
     ap.add_argument("--sglang-url", default="http://localhost:30000")
-    ap.add_argument("--n", type=int, default=None,
-                    help="Limit number of rows (default: all rows in parquet)")
-    ap.add_argument("--doc", default=None,
-                    help="Only decode rows where doc_id matches this value")
+    ap.add_argument(
+        "--n", type=int, default=None, help="Limit number of rows (default: all rows in parquet)"
+    )
+    ap.add_argument("--doc", default=None, help="Only decode rows where doc_id matches this value")
     ap.add_argument("--temperature", type=float, default=0.7)
     ap.add_argument("--max-new-tokens", type=int, default=200)
     args = ap.parse_args()

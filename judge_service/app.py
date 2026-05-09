@@ -15,11 +15,12 @@ Env (all optional except ANTHROPIC_API_KEY when JUDGE_BACKEND=claude):
     CORS_ORIGINS      "*" (default; comma-separated)
     ANTHROPIC_API_KEY required when JUDGE_BACKEND=claude
 """
+
 from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
@@ -59,9 +60,7 @@ def _build_judge() -> Judge:
                 "Set it in the Railway dashboard (or your shell) and restart."
             )
         return ClaudeJudge(model=JUDGE_MODEL, flag_threshold=THRESHOLD)
-    raise ValueError(
-        f"unknown JUDGE_BACKEND={JUDGE_BACKEND!r}; expected 'claude' or 'regex'"
-    )
+    raise ValueError(f"unknown JUDGE_BACKEND={JUDGE_BACKEND!r}; expected 'claude' or 'regex'")
 
 
 _state: dict[str, Judge] = {}
@@ -85,8 +84,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",")
-           if o.strip()]
+origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -105,6 +103,7 @@ except ImportError:
 
 
 if _anthropic is not None:
+
     @app.exception_handler(_anthropic.APIStatusError)
     async def _anthropic_status_handler(request: Request, exc):
         return JSONResponse(
@@ -147,7 +146,7 @@ async def healthz() -> HealthResponse:
 
 @app.get("/rubrics", response_model=list[RubricInfo])
 async def list_rubrics(
-    mode: Optional[Literal["A", "B"]] = Query(
+    mode: Literal["A", "B"] | None = Query(
         None,
         description="Filter to rubrics active in this mode. Omit for all.",
     ),

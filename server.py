@@ -23,6 +23,7 @@ Env vars:
     EXTRACTOR_DEVICE default cuda
     CORS_ORIGINS     comma-separated, default *
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -38,7 +39,6 @@ from pydantic import BaseModel, Field
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from nla_inference import NLAClient, NLACritic
-
 
 QWEN_BASE_MODEL = os.environ.get("QWEN_BASE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 QWEN_LAYER_INDEX = int(os.environ.get("QWEN_LAYER_INDEX", "20"))
@@ -60,7 +60,9 @@ class Extractor:
         print(f"[extractor] loading {model_name} on {device}")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_name, torch_dtype=torch.bfloat16, device_map=device,
+            model_name,
+            torch_dtype=torch.bfloat16,
+            device_map=device,
         ).eval()
         self.device = self.model.get_input_embeddings().weight.device
         self.layer_index = layer_index
@@ -77,12 +79,12 @@ class Extractor:
         """Returns (token_ids, hidden[T, d_model] fp32 on cpu)."""
         self._captured.clear()
         ids = self.tokenizer(
-            text, return_tensors="pt", add_special_tokens=True,
+            text,
+            return_tensors="pt",
+            add_special_tokens=True,
         )["input_ids"].to(self.device)
         self.model(input_ids=ids, use_cache=False)
-        assert len(self._captured) == 1, (
-            f"hook fired {len(self._captured)} times (expected 1)"
-        )
+        assert len(self._captured) == 1, f"hook fired {len(self._captured)} times (expected 1)"
         return ids[0].cpu().tolist(), self._captured[0].float().cpu()[0]
 
 
@@ -119,8 +121,9 @@ app.add_middleware(
 
 class DecodeRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=4000)
-    skip_first: int = Field(10, ge=0,
-                            description="Skip first N positions — early-context noise per README")
+    skip_first: int = Field(
+        10, ge=0, description="Skip first N positions — early-context noise per README"
+    )
     score: bool = False
     temperature: float = 0.7
     max_new_tokens: int = 200
@@ -145,7 +148,7 @@ class DecodeResponse(BaseModel):
 
 def _format_context(prev: str, current: str) -> str:
     """Same shape as scripts/decode_parquet.py: wrap the new chunk in []."""
-    return f"[{current}]" if not prev else f"{prev}[{current[len(prev):]}]"
+    return f"[{current}]" if not prev else f"{prev}[{current[len(prev) :]}]"
 
 
 @app.post("/decode", response_model=DecodeResponse)
@@ -165,7 +168,8 @@ async def decode(req: DecodeRequest) -> DecodeResponse:
         contexts: list[tuple[str, str]] = []
         for pos in positions:
             current = state.extractor.tokenizer.decode(
-                token_ids[: pos + 1], skip_special_tokens=True,
+                token_ids[: pos + 1],
+                skip_special_tokens=True,
             )
             contexts.append((current, _format_context(prev, current)))
             prev = current
@@ -174,18 +178,21 @@ async def decode(req: DecodeRequest) -> DecodeResponse:
 
         # Fan out actor calls. SGLang's continuous batcher packs them server-side;
         # sequential httpx posts here would serialize end-to-end and miss that.
-        decodes = await asyncio.gather(*[
-            asyncio.to_thread(
-                state.actor.generate, v,
-                temperature=req.temperature,
-                max_new_tokens=req.max_new_tokens,
-            )
-            for v in vectors
-        ])
+        decodes = await asyncio.gather(
+            *[
+                asyncio.to_thread(
+                    state.actor.generate,
+                    v,
+                    temperature=req.temperature,
+                    max_new_tokens=req.max_new_tokens,
+                )
+                for v in vectors
+            ]
+        )
 
         if req.score:
             scores: list[tuple[float | None, float | None]] = []
-            for d, v in zip(decodes, vectors):
+            for d, v in zip(decodes, vectors, strict=True):
                 mse, cos = await asyncio.to_thread(state.critic.score, d, v)
                 scores.append((mse, cos))
         else:
@@ -198,10 +205,16 @@ async def decode(req: DecodeRequest) -> DecodeResponse:
             context_highlighted=cx,
             norm=float(np.linalg.norm(v)),
             decode=d,
-            mse=m, cos=c,
+            mse=m,
+            cos=c,
         )
         for pos, (ct, cx), v, d, (m, c) in zip(
-            positions, contexts, vectors, decodes, scores,
+            positions,
+            contexts,
+            vectors,
+            decodes,
+            scores,
+            strict=True,
         )
     ]
     return DecodeResponse(

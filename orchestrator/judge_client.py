@@ -5,10 +5,11 @@ Wraps POST /judge with sane timeouts. Designed to be polled mid-stream
 on a transport / 5xx error we return None and the caller decides
 whether to emit an error event or carry on without a verdict.
 """
+
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -30,7 +31,7 @@ class JudgeClient:
         self.base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._max_retries = max_retries
-        self._http: Optional[httpx.AsyncClient] = None
+        self._http: httpx.AsyncClient | None = None
 
     async def start(self) -> None:
         self._http = httpx.AsyncClient(
@@ -43,7 +44,7 @@ class JudgeClient:
             await self._http.aclose()
             self._http = None
 
-    async def healthz(self) -> Optional[dict[str, Any]]:
+    async def healthz(self) -> dict[str, Any] | None:
         if self._http is None:
             return None
         try:
@@ -54,7 +55,7 @@ class JudgeClient:
             log.warning("judge healthz failed: %s", e)
             return None
 
-    async def judge(self, s: str, mode: Mode) -> Optional[JudgeVerdict]:
+    async def judge(self, s: str, mode: Mode) -> JudgeVerdict | None:
         """Score one monologue. Returns None on transport / parse failure."""
         if self._http is None:
             log.warning("judge_client.judge called before .start()")

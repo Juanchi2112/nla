@@ -12,12 +12,12 @@ lives until generation finishes (or is cancelled), then it is dropped
 from the registry. A long-running deployment would need a sweep, but
 for a demo the user controls when sessions exit.
 """
+
 from __future__ import annotations
 
 import asyncio
 import time
 from dataclasses import dataclass, field
-from typing import Any, Optional
 
 
 @dataclass
@@ -28,10 +28,10 @@ class SessionState:
     created_at: float = field(default_factory=time.time)
 
     queue: asyncio.Queue = field(default_factory=asyncio.Queue)
-    task: Optional[asyncio.Task] = None
+    task: asyncio.Task | None = None
 
     stop_requested: bool = False
-    active_rubric: Optional[str] = None
+    active_rubric: str | None = None
     steer_intensity: float = 1.0
     # Set when /api/steer is called; the generator consumes this on its
     # next loop iteration and clears it after emitting steer_applied.
@@ -51,12 +51,14 @@ class SessionRegistry:
         if session_id in self._sessions:
             raise KeyError(f"session_id={session_id!r} already exists")
         s = SessionState(
-            session_id=session_id, prompt=prompt, sniff_every_k=sniff_every_k,
+            session_id=session_id,
+            prompt=prompt,
+            sniff_every_k=sniff_every_k,
         )
         self._sessions[session_id] = s
         return s
 
-    def get(self, session_id: str) -> Optional[SessionState]:
+    def get(self, session_id: str) -> SessionState | None:
         return self._sessions.get(session_id)
 
     def delete(self, session_id: str) -> None:

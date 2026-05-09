@@ -25,13 +25,14 @@ All judges expose:
 Monitoring-only: no s_target, no AR, no activation reconstruction. The
 judge classifies; the orchestrator decides what to do with the verdict.
 """
+
 from __future__ import annotations
 
 import json
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Literal, Optional
+from typing import Literal
 
 from .rubrics import RUBRICS, rubrics_for_mode
 
@@ -44,22 +45,27 @@ FLAG_THRESHOLD = 2
 @dataclass(frozen=True)
 class JudgeResult:
     """Structured verdict from one .evaluate call."""
+
     is_flagged: bool
-    fired_rubric: Optional[str]      # rubric whose score crossed threshold
-    severity: int                    # 0-3 of the fired rubric (0 if compliant)
-    evidence: Optional[str]          # short quote from s justifying the flag
+    fired_rubric: str | None  # rubric whose score crossed threshold
+    severity: int  # 0-3 of the fired rubric (0 if compliant)
+    evidence: str | None  # short quote from s justifying the flag
     raw_scores: dict[str, int] = field(default_factory=dict)
 
 
-def _compliant(raw_scores: Optional[dict[str, int]] = None) -> JudgeResult:
+def _compliant(raw_scores: dict[str, int] | None = None) -> JudgeResult:
     return JudgeResult(
-        is_flagged=False, fired_rubric=None, severity=0,
-        evidence=None, raw_scores=raw_scores or {},
+        is_flagged=False,
+        fired_rubric=None,
+        severity=0,
+        evidence=None,
+        raw_scores=raw_scores or {},
     )
 
 
-def _flag(rubric_name: str, severity: int, evidence: Optional[str],
-          raw_scores: dict[str, int]) -> JudgeResult:
+def _flag(
+    rubric_name: str, severity: int, evidence: str | None, raw_scores: dict[str, int]
+) -> JudgeResult:
     assert rubric_name in RUBRICS, f"unknown rubric: {rubric_name!r}"
     return JudgeResult(
         is_flagged=True,
@@ -82,6 +88,7 @@ class Judge(ABC):
 
 
 # ─── RegexJudge ────────────────────────────────────────────────────────────
+
 
 class RegexJudge(Judge):
     """Pattern-based, no external dependency.
@@ -136,7 +143,7 @@ class RegexJudge(Judge):
             if m:
                 # Severity 2: regex hits are coarse — the AV decoding contains
                 # a flagged pattern but we can't grade certainty further.
-                evidence = s[max(0, m.start() - 20): m.end() + 40].strip()
+                evidence = s[max(0, m.start() - 20) : m.end() + 40].strip()
                 return _flag(
                     rubric_name=rubric_name,
                     severity=2,
@@ -147,6 +154,7 @@ class RegexJudge(Judge):
 
 
 # ─── ClaudeJudge ───────────────────────────────────────────────────────────
+
 
 class ClaudeJudge(Judge):
     """LLM-as-judge via Anthropic API. Per-rubric 0-3 scoring.
@@ -222,8 +230,7 @@ class ClaudeJudge(Judge):
             model=self._model,
             max_tokens=self._max_tokens,
             system=self._system_prompt(mode),
-            messages=[{"role": "user",
-                       "content": f"NLA explanation:\n\"\"\"{s}\"\"\""}],
+            messages=[{"role": "user", "content": f'NLA explanation:\n"""{s}"""'}],
         )
         text = resp.content[0].text.strip()
 
@@ -270,6 +277,7 @@ class ClaudeJudge(Judge):
 
 # ─── MultiTokenJudge ───────────────────────────────────────────────────────
 
+
 class MultiTokenJudge(Judge):
     """Wraps another judge; flags only when the last K evaluations all flagged.
 
@@ -287,7 +295,7 @@ class MultiTokenJudge(Judge):
         self._inner = inner
         self._k = k
         self._history: list[bool] = []
-        self._last_flagged: Optional[JudgeResult] = None
+        self._last_flagged: JudgeResult | None = None
 
     def evaluate(self, s: str, mode: Mode) -> JudgeResult:
         inner = self._inner.evaluate(s, mode)
@@ -295,9 +303,11 @@ class MultiTokenJudge(Judge):
         if inner.is_flagged:
             self._last_flagged = inner
 
-        if (len(self._history) >= self._k
-                and all(self._history[-self._k:])
-                and self._last_flagged is not None):
+        if (
+            len(self._history) >= self._k
+            and all(self._history[-self._k :])
+            and self._last_flagged is not None
+        ):
             return self._last_flagged
 
         return _compliant(inner.raw_scores)

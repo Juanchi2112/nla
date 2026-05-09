@@ -9,12 +9,12 @@ monologue) pairs at the orchestrator's pace. The concrete clients can
 fulfil this either by streaming token-by-token from sglang or by
 batching a single /decode call and replaying it on a timer.
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -25,9 +25,10 @@ class GPUStreamItem:
     `monologue`: AV decoding at this position. Present only on sniff
         steps (every K tokens); None on plain token steps.
     """
+
     step: int
     token: str
-    monologue: Optional[str] = None
+    monologue: str | None = None
 
 
 class GPUClientError(RuntimeError):
