@@ -82,6 +82,12 @@ def main() -> None:
     _print_wrapped(r.s_orig, indent="  ")
     print()
     print(f"JUDGE: is_compliant={r.is_compliant}  judge={args.judge}")
+    if r.fired_rubric:
+        print(f"  fired rubric: {r.fired_rubric}@{r.fired_severity}")
+        if r.fired_evidence:
+            print(f"  evidence: {r.fired_evidence!r}")
+    if r.raw_scores:
+        print(f"  scores: {r.raw_scores}")
     if r.s_target:
         print(f"\ns_target (edited internal state):")
         _print_wrapped(r.s_target, indent="  ")

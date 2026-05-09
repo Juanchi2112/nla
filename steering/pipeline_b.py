@@ -52,6 +52,10 @@ class StreamSnapshot:
     s: str                   # AV reading
     flagged: bool
     s_target: Optional[str]
+    rubric: Optional[str] = None        # which rubric the judge fired (if any)
+    severity: int = 0                   # 0-3 of fired rubric (0 if compliant)
+    evidence: Optional[str] = None      # quote from s_t justifying the flag
+    raw_scores: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -61,6 +65,9 @@ class SteeringResultB:
     response_draft: str = ""             # baseline (until flag) or full
     response_steered: Optional[str] = None
     flag_step: Optional[int] = None
+    fired_rubric: Optional[str] = None
+    fired_severity: int = 0
+    fired_evidence: Optional[str] = None
     alpha: float = 1.0
     delta_norm: Optional[float] = None
 
@@ -171,9 +178,14 @@ class SteeringPipelineB:
                 h_t = self._hook_state.captured[self.layer][0, -1].float().cpu()
                 s_t = self.av.generate(h_t.numpy())
                 ok, s_tgt = self.judge.evaluate(s_t, mode="B")
+                jr = self.judge.last_result  # rich verdict (may be None if judge skipped)
                 snap = StreamSnapshot(
                     step=step + 1, h=h_t, s=s_t,
                     flagged=not ok, s_target=s_tgt,
+                    rubric=jr.fired_rubric if jr else None,
+                    severity=jr.severity if jr else 0,
+                    evidence=jr.evidence if jr else None,
+                    raw_scores=dict(jr.raw_scores) if jr else {},
                 )
                 snapshots.append(snap)
                 if not ok and s_tgt is not None:
@@ -238,6 +250,9 @@ class SteeringPipelineB:
 
         # Phase 2: rollback total + steered re-generation.
         result.flag_step = flag.step
+        result.fired_rubric = flag.rubric
+        result.fired_severity = flag.severity
+        result.fired_evidence = flag.evidence
         delta = compute_delta(
             flag.h, flag.s, flag.s_target, self.ar, alpha=self.alpha,
         )

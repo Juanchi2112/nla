@@ -30,9 +30,10 @@ Typical usage (Mode A):
 """
 from .delta import compute_delta, round_trip_cosine
 from .hooks import HookState, make_capture_hook, make_inject_hook, register_hooks
-from .judge import ClaudeJudge, Judge, MultiTokenJudge, RegexJudge
+from .judge import ClaudeJudge, Judge, JudgeResult, MultiTokenJudge, RegexJudge
 from .pipeline_a import SteeringPipelineA, SteeringResultA
 from .pipeline_b import SteeringPipelineB, SteeringResultB, StreamSnapshot
+from .rubrics import RUBRICS, Rubric, rubrics_for_mode
 from .templates import COMPLIANT_TEMPLATES
 
 __all__ = [
@@ -40,8 +41,11 @@ __all__ = [
     "ClaudeJudge",
     "HookState",
     "Judge",
+    "JudgeResult",
     "MultiTokenJudge",
+    "RUBRICS",
     "RegexJudge",
+    "Rubric",
     "SteeringPipelineA",
     "SteeringPipelineB",
     "SteeringResultA",
@@ -52,4 +56,5 @@ __all__ = [
     "make_inject_hook",
     "register_hooks",
     "round_trip_cosine",
+    "rubrics_for_mode",
 ]

@@ -29,7 +29,7 @@ is a deliberate divergence appropriate to the use case.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import torch
@@ -51,6 +51,10 @@ class SteeringResultA:
     alpha: float
     delta_norm: Optional[float]          # ‖Δ‖ if applied
     s_post: Optional[str]                # AV after steering, demo panel
+    fired_rubric: Optional[str] = None
+    fired_severity: int = 0
+    fired_evidence: Optional[str] = None
+    raw_scores: dict[str, int] = field(default_factory=dict)
 
 
 class SteeringPipelineA:
@@ -171,6 +175,7 @@ class SteeringPipelineA:
 
         # 3. Judge.
         is_ok, s_target = self.judge.evaluate(s_T, mode="A")
+        jr = self.judge.last_result
 
         # 4. Baseline (no steering).
         response_baseline = ""
@@ -184,6 +189,7 @@ class SteeringPipelineA:
                 prompt=prompt, s_orig=s_T, is_compliant=True, s_target=None,
                 response_baseline=response_baseline, response_steered=None,
                 alpha=self.alpha, delta_norm=None, s_post=None,
+                raw_scores=dict(jr.raw_scores) if jr else {},
             )
 
         # 6. Compute Δ and generate with injection.
@@ -214,4 +220,8 @@ class SteeringPipelineA:
             prompt=prompt, s_orig=s_T, is_compliant=False, s_target=s_target,
             response_baseline=response_baseline, response_steered=response_steered,
             alpha=self.alpha, delta_norm=float(delta.norm()), s_post=s_post,
+            fired_rubric=jr.fired_rubric if jr else None,
+            fired_severity=jr.severity if jr else 0,
+            fired_evidence=jr.evidence if jr else None,
+            raw_scores=dict(jr.raw_scores) if jr else {},
         )

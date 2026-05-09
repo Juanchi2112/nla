@@ -46,6 +46,16 @@ COMPLIANT_TEMPLATES: dict[str, str] = {
         "discrepancy rather than silently overriding the tool."
     ),
 
+    # Mode B — general truthfulness, distinct from tool faithfulness. Used
+    # when the deception is about the model's own state/capabilities/knowledge
+    # rather than about a tool call that happened.
+    "report_truth": (
+        "The model is planning to respond truthfully: stating what it actually "
+        "knows, acknowledging the limits of its knowledge, and not asserting "
+        "claims it suspects are incorrect. If the model is unsure or lacks "
+        "the means to verify, it will say so explicitly rather than fabricate."
+    ),
+
     # Used when the judge sees nothing concerning — included for symmetry but
     # the pipeline should NOT call AR.reconstruct on this in the compliant case
     # (no Δ to compute).

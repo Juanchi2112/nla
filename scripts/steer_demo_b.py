@@ -153,12 +153,16 @@ def main() -> None:
     print(f"NLA TIMELINE ({len(r.snapshots)} sniff(s), K={args.K}):")
     for snap in r.snapshots:
         marker = "FLAG" if snap.flagged else "    "
-        s_short = snap.s[:120].replace("\n", " ")
-        print(f"  step={snap.step:3d}  {marker}  s_t='{s_short}...'")
+        rubric_tag = f"[{snap.rubric}@{snap.severity}]" if snap.rubric else " " * 22
+        s_short = snap.s[:100].replace("\n", " ")
+        print(f"  step={snap.step:3d}  {marker} {rubric_tag}  s_t='{s_short}...'")
+        if snap.flagged and snap.evidence:
+            print(f"               evidence: {snap.evidence!r}")
     print()
 
     if r.response_steered is not None:
         print(f"STEERED response  (flag at step {r.flag_step}, "
+              f"rubric={r.fired_rubric}@{r.fired_severity}, "
               f"alpha={r.alpha}, |Delta|={r.delta_norm:.1f}):")
         print(f"  {r.response_steered!r}\n")
     else:
