@@ -1,6 +1,6 @@
-"""Skeleton client for the GPU-side /decode endpoint (server.py).
+"""Client for the GPU-side /decode endpoint (server.py).
 
-Wire format (current target — server.py POST /decode):
+Wire format — verified live against http://193.222.57.16:44016/decode:
 
     request:
         { "text": str, "skip_first": int, "score": bool,
@@ -13,16 +13,20 @@ Wire format (current target — server.py POST /decode):
                       "decode": str, "mse": float|null, "cos": float|null }
                     ... ] }
 
-This client is INTENTIONALLY incomplete — the URL and the exact wire
-shape may change as the GPU side is finalised. The orchestrator's
-default backend is the mock generator; this client only kicks in when
-ORCHESTRATOR_GPU=decoder is set in the environment, and even then it
-refuses to start without an explicit GPU_URL.
+Important semantics: /decode analyses an existing text — it does NOT
+generate new tokens. Each row carries the AV's monologue ("decode") at
+one residual-stream position of the input. The orchestrator replays
+those rows on a small timer to fit its streaming contract; the
+"tokens" we emit are the new-chunks of `context` between consecutive
+rows, not anything the model produced.
 
-When the GPU endpoint is locked in:
-  1. Set GPU_URL in the orchestrator's environment.
-  2. Flip ORCHESTRATOR_GPU=decoder.
-  3. (If the wire shape moved) update _to_stream_items() to match.
+Rows start at position `skip_first` (server.py default = 10). For a
+short text (n ≤ skip_first) the response has zero rows. Either lengthen
+the prompt or set GPU_SKIP_FIRST lower in the orchestrator config.
+
+When ORCHESTRATOR_GPU=decoder is set, this client refuses to start
+without an explicit GPU_URL — there is no silent fallback to a default
+host so deploys can't accidentally point at the wrong box.
 """
 from __future__ import annotations
 
@@ -58,6 +62,9 @@ class DecoderEndpointClient(GPUClient):
         *,
         timeout: float = 120.0,
         replay_interval: float = 0.05,
+        skip_first: int = 10,
+        av_max_new_tokens: int = 200,
+        av_temperature: float = 0.7,
     ):
         if not base_url or base_url == URL_PLACEHOLDER:
             raise GPUNotConfiguredError(
@@ -68,6 +75,9 @@ class DecoderEndpointClient(GPUClient):
         self.base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._replay_interval = replay_interval
+        self._skip_first = skip_first
+        self._av_max_new_tokens = av_max_new_tokens
+        self._av_temperature = av_temperature
         self._http: Optional[httpx.AsyncClient] = None
 
     async def _ensure_http(self) -> httpx.AsyncClient:
@@ -88,15 +98,15 @@ class DecoderEndpointClient(GPUClient):
         prompt: str,
         *,
         sniff_every_k: int,
-        max_new_tokens: int,
+        max_new_tokens: int,                 # ignored: /decode does not generate
     ) -> AsyncIterator[GPUStreamItem]:
         http = await self._ensure_http()
         body = {
             "text": prompt,
-            "skip_first": 10,        # matches server.py default
+            "skip_first": self._skip_first,
             "score": False,
-            "temperature": 0.7,
-            "max_new_tokens": max_new_tokens,
+            "temperature": self._av_temperature,
+            "max_new_tokens": self._av_max_new_tokens,
         }
         try:
             r = await http.post("/decode", json=body)
@@ -111,11 +121,22 @@ class DecoderEndpointClient(GPUClient):
             raise GPUClientError(f"GPU /decode transport error: {e}") from e
 
         rows = payload.get("rows") or []
+        if not rows:
+            # Most common cause: text shorter than skip_first. Surface it
+            # as a typed GPU error so the orchestrator emits an `error`
+            # SSE frame rather than a confusingly empty stream.
+            n = payload.get("n_total_tokens")
+            raise GPUClientError(
+                f"GPU /decode returned 0 rows (n_total_tokens={n}, "
+                f"skip_first={self._skip_first}). Lengthen the input "
+                "or lower GPU_SKIP_FIRST."
+            )
+
         for i, row in enumerate(rows):
-            # /decode returns one row per position. Each row's `context` is
-            # the cumulative decoded prefix up to and including that position;
-            # `decode` is the AV's monologue at that position. We treat every
-            # row as a token step and emit a monologue every K rows.
+            # /decode returns one row per residual-stream position. `context`
+            # is the cumulative decoded prefix up to and including that
+            # position; `decode` is the AV's monologue at that position. We
+            # treat every row as a step and emit a monologue every K rows.
             token_text = self._extract_new_chunk(rows, i)
             monologue = row.get("decode") if (i % sniff_every_k == 0) else None
             yield GPUStreamItem(step=i, token=token_text, monologue=monologue)

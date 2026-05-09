@@ -71,6 +71,8 @@ JUDGE_URL = os.environ.get("JUDGE_URL", "http://localhost:8000")
 JUDGE_TIMEOUT = float(os.environ.get("JUDGE_TIMEOUT", "5.0"))
 ORCH_GPU = os.environ.get("ORCHESTRATOR_GPU", "mock").lower()
 GPU_URL = os.environ.get("GPU_URL", URL_PLACEHOLDER)
+GPU_SKIP_FIRST = int(os.environ.get("GPU_SKIP_FIRST", "10"))
+GPU_TIMEOUT = float(os.environ.get("GPU_TIMEOUT", "120.0"))
 MAX_NEW_TOKENS = int(os.environ.get("MAX_NEW_TOKENS", "128"))
 
 
@@ -79,7 +81,11 @@ def _build_gpu_client() -> GPUClient:
         return MockGPUClient()
     if ORCH_GPU == "decoder":
         # Raises GPUNotConfiguredError if GPU_URL is the placeholder.
-        return DecoderEndpointClient(GPU_URL)
+        return DecoderEndpointClient(
+            GPU_URL,
+            timeout=GPU_TIMEOUT,
+            skip_first=GPU_SKIP_FIRST,
+        )
     raise ValueError(
         f"unknown ORCHESTRATOR_GPU={ORCH_GPU!r}; expected 'mock' or 'decoder'"
     )
@@ -245,6 +251,8 @@ async def healthz(request: Request) -> dict[str, Any]:
         "status": "ok",
         "gpu_backend": ORCH_GPU,
         "gpu_url_set": GPU_URL != URL_PLACEHOLDER,
+        "gpu_url": GPU_URL if GPU_URL != URL_PLACEHOLDER else None,
+        "gpu_skip_first": GPU_SKIP_FIRST,
         "judge_url": JUDGE_URL,
         "judge_reachable": judge_health is not None,
         "max_new_tokens": MAX_NEW_TOKENS,
