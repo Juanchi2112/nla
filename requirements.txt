@@ -8,3 +8,6 @@ numpy<2.0
 huggingface-hub
 pyarrow
 sglang[all]>=0.5.6
+# optional — only needed if you use steering.ClaudeJudge instead of RegexJudge.
+# Set ANTHROPIC_API_KEY env var when invoking the steering pipeline with --judge claude.
+anthropic
