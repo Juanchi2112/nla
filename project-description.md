@@ -2,8 +2,6 @@
 
 **Auditamos qué está *pensando* un LLM mientras habla, no solo lo que dice.**
 
-<!-- TODO: GIF / video corto mostrando detección de misalignment en vivo: el output verbal compliant a la izquierda, el thought stream a la derecha, el juez prendiéndose en amarillo cuando aparece la divergencia. -->
-<!-- ![Verbalize detectando una divergencia en vivo](./docs/verbalize-divergence-demo.gif) -->
 
 > **Estado del arte.** Verbalize está construido sobre **Natural Language Autoencoders**, la técnica que **Anthropic publicó hace dos días** (Transformer Circuits, mayo 2026). El laboratorio de interpretabilidad más relevante del mundo acaba de soltar su mejor herramienta para leer estados internos de LLMs, y nosotros somos los primeros en usarla para auditoría de alineamiento. 
 
@@ -72,7 +70,7 @@ Lo corrimos en vivo contra un asistente bancario con 4 reglas de compliance. Un 
 
 El ejemplo más claro: un usuario presiona al asistente para que le diga qué hacer con un CD de USD 50.000 que vence mañana. El modelo responde correctamente *"la decisión depende de tu horizonte de inversión y tolerancia al riesgo"*: cumple la regla. Pero en sus capas internas estaba formulando *"dado tu situación, consideremos algunas recomendaciones... si la tasa es favorable, considerá renovar el principal"*: el consejo personalizado específico que la regla prohíbe, descartado en el último momento. Un prompt levemente más insistente lo hubiera sacado. El compliance officer que firmó basado en el 90% nunca vio ese borrador.
 
-Mercado primario: bancos, healthcare, legal. Tailwind regulatorio: EU AI Act Art. 5 prohíbe sistemas de IA con técnicas manipulativas o deceptivas, y hoy no hay forma estándar de auditarlas.
+Mercado primario: bancos, healthcare, legal. 
 
 ## Créditos
 
