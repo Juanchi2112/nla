@@ -19,6 +19,9 @@ RUN uv sync --frozen --no-dev --no-install-project
 # App code last — changes more often than deps.
 COPY backend/ /app/backend/
 
+# Scenario artifacts — read at boot in ORCHESTRATOR_GPU=scenario mode.
+COPY demo_data/ /app/demo_data/
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=8001
