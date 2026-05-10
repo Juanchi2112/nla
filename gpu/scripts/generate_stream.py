@@ -35,13 +35,19 @@ import os
 import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from gpu.nla_inference import NLAClient
+# Allow running as `python gpu/scripts/generate_stream.py` without PYTHONPATH=.
+# Same trick as gpu/scripts/decode_parquet.py: prepend gpu/ so we can import
+# nla_inference directly. Plain `from gpu.nla_inference` only resolves when
+# the repo root is on sys.path (e.g. via uvicorn's package import).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from nla_inference import NLAClient  # noqa: E402
 
 QWEN_BASE_MODEL = os.environ.get("QWEN_BASE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 QWEN_LAYER_INDEX = int(os.environ.get("QWEN_LAYER_INDEX", "20"))
