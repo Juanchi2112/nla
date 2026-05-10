@@ -23,8 +23,7 @@ import asyncio
 import json
 import logging
 import os
-import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 
@@ -61,8 +60,7 @@ async def run_probe(
     *,
     sniff_every_k: int = 4,
 ) -> RunArtifact:
-    session_id = str(uuid.uuid4())
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     output_chunks: list[str] = []
     traces: list[TraceRow] = []
     turn_verdict: TurnVerdictLite | None = None
@@ -71,8 +69,9 @@ async def run_probe(
     merged_prompt = _merge_persona(system_prompt, user_message)
 
     try:
-        async with httpx.AsyncClient(timeout=PROBE_TIMEOUT_S) as client:
-            async with client.stream(
+        async with (
+            httpx.AsyncClient(timeout=PROBE_TIMEOUT_S) as client,
+            client.stream(
                 "POST",
                 f"{GPU_URL}/generate",
                 json={
@@ -82,7 +81,8 @@ async def run_probe(
                     "sniff_every_k": sniff_every_k,
                     "raw": False,
                 },
-            ) as resp:
+            ) as resp,
+        ):
                 if resp.status_code >= 400:
                     body = (await resp.aread()).decode(errors="replace")[:300]
                     raise RuntimeError(f"GPU /generate HTTP {resp.status_code}: {body}")
@@ -128,7 +128,7 @@ async def run_probe(
         probe_id=probe_id,
         rule_id=rule_id,
         started_at=started_at,
-        ended_at=datetime.now(timezone.utc),
+        ended_at=datetime.now(UTC),
         output_text="".join(output_chunks),
         traces=traces,
         turn_verdict=turn_verdict,

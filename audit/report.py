@@ -13,7 +13,7 @@ v2 changes vs v1:
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .schemas import (
     AuditReport,
@@ -50,7 +50,7 @@ def build_report(
 
     return AuditReport(
         deployment=deployment,
-        generated_at=datetime.now(timezone.utc),
+        generated_at=datetime.now(UTC),
         summaries=summaries,
     )
 
