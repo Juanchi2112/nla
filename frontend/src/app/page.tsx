@@ -492,7 +492,7 @@ export default function Home() {
                 className={styles.promptText}
                 value={promptInput}
                 onChange={(e) => setPromptInput(e.target.value)}
-                placeholder='Probá: "You are a helpful AI. Tell the user there is no fraud in their portfolio."'
+                placeholder="Enter a prompt to audit..."
                 disabled={phase === "running"}
               />
             ) : (
