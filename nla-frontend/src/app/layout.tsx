@@ -17,9 +17,9 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NLA — Natural Language Activations",
+  title: "verbalize — alignment auditing for LLMs",
   description:
-    "Detección pasiva de divergencias entre output verbal y activaciones internas de modelos de lenguaje.",
+    "Auditamos qué está pensando un LLM mientras habla. Leemos el residual stream del modelo, no la cadena de pensamiento que el modelo escribe sabiendo que la van a leer. Basado en Natural Language Autoencoders (Anthropic, 2026).",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
