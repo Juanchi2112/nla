@@ -283,9 +283,17 @@ async def stream_events(
                     break
                 cur_ids = torch.tensor([[next_id]], device=extractor.device)
 
-        # Drain stragglers.
-        if pending:
-            await asyncio.wait([at.task for at in pending])
+        # Drain stragglers incrementally — yield each nla_trace as it
+        # completes, not all-at-once at the end. With sniff_every_k=1 (or
+        # any setting where actor calls outlast Qwen generation) this is
+        # the difference between a smooth tail and "all traces arrive in a
+        # clump 20s after the last token" while SGLang's input_embeds cap
+        # serializes the queued calls.
+        while pending:
+            await asyncio.wait(
+                [at.task for at in pending],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
             for done_ev in collect_done():
                 yield done_ev
 
