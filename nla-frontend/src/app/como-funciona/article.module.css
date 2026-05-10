@@ -43,15 +43,15 @@
   position: relative;
   width: 100%;
   left: auto;
-  max-width: 1280px;
+  max-width: 1100px;
   margin: 0 auto;
   grid-column: 1 / -1;
   padding-left: 0;
   padding-right: 0;
   transform: translateY(20px);
 }
-.b6Wide { max-width: 1300px; }
-.block8 { max-width: 1200px; }
+.b6Wide { max-width: 1100px; }
+.block8 { max-width: 1300px; }
 
 @media (max-width: 899px) {
   .article { grid-template-columns: 1fr; column-gap: 0; }
@@ -79,12 +79,13 @@
 
 .blockTitle {
   font-family: var(--font-serif);
-  font-size: 60px;
+  font-size: 48px;
   font-weight: var(--weight-semibold);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
   color: var(--fg);
   margin: 0 0 var(--space-lg) 0;
+  padding: 0 40px;
 }
 
 /* Hide inline number when block uses numAsBg watermark (data-num present) */
@@ -438,8 +439,7 @@
 
 .b5MatrixWrap {
   margin-top: 12px;
-  overflow-x: auto;
-  max-width: 100%;
+  overflow: hidden;
 }
 .b5Matrix {
   font-family: var(--font-mono);
@@ -803,11 +803,11 @@
 .b8Headline.show { opacity: 1; }
 .b8Composition {
   position: relative;
-  min-height: 760px;
+  min-height: 500px;
   display: flex;
   justify-content: center;
   align-items: center;
-  max-width: 1500px;
+  max-width: 1400px;
   margin: 40px auto 0;
   padding: 40px 0;
   overflow: visible;

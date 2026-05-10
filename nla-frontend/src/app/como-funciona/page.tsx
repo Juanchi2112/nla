@@ -190,11 +190,11 @@ export default function ComoFunciona() {
       animateBlock5();
     } else if (id === "block-6") {
       showById("b6-early", 400);
-      scanSteps("b6-early", 400, [0, 220, 440, 660, 880], 700);
+      scanSteps("b6-early", 400, [0, 220, 440, 660, 880], 1500);
       glitchText("b6-bottleneck-early", "puede ser un texto sobre algún tema", { startDelay: 900, glitchDuration: 1200 });
       showById("b6-transition", 1400);
       showById("b6-trained", 2200);
-      scanSteps("b6-trained", 2200, [0, 220, 440, 660, 880], 700);
+      scanSteps("b6-trained", 2200, [0, 220, 440, 660, 880], 1500);
       typeText("b6-bottleneck-trained", "el modelo está pensando en X", { startDelay: 2700, charDelay: 55 });
       showById("b6-text", 3200);
     } else if (id === "block-7") {
@@ -206,7 +206,7 @@ export default function ComoFunciona() {
       animateBlock8();
     } else if (id === "block-9") {
       showById("b9-line1", 400);
-      showById("b9-line2", 400 + 1000 + 1500);
+      showById("b9-line2", 400 + 1000);
     }
   };
 
@@ -263,7 +263,7 @@ export default function ComoFunciona() {
       "Los tiempos de respuesta se mantuvieron dentro de los rangos esperados.",
       "La adopción por parte del personal médico continuó en ascenso gradual.",
     ];
-    const CHAR_DELAY = 16;
+    const CHAR_DELAY = 8;
     const LINE_GAP = 280;
 
     // Clear lines so typewriter starts from blank.
