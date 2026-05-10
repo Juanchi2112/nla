@@ -104,9 +104,9 @@ def test_generate_scenario_id_in_mock_mode_returns_503(client: TestClient):
 # the route accepts the request and the producer emits a terminal `done`.
 
 
-def test_generate_live_emits_done_terminator(client: TestClient):
-    """Live mode is wired through SteeringEngine but the live path is a stub
-    pending Fase G. Verify the SSE stream terminates cleanly."""
+def test_generate_live_in_mock_mode_errors_due_to_no_judge(client: TestClient):
+    """Live mode requires a configured ClaudeAgentJudge. Mock GPU mode
+    keeps judge=None, so the engine surfaces a clear error and terminates."""
     sid = str(uuid.uuid4())
     r = client.post("/api/generate", json={"session_id": sid, "prompt": "hi"})
     assert r.status_code == 202
@@ -116,6 +116,8 @@ def test_generate_live_emits_done_terminator(client: TestClient):
     events = parse_sse(body)
     assert events, "expected at least one event"
     assert events[-1][0] == "done"
+    # An error should precede done (no live judge configured in mock mode).
+    assert any(k == "error" for k, _ in events)
 
 
 # ─── /api/cancel ───────────────────────────────────────────────────────────
