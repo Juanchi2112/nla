@@ -456,7 +456,6 @@ export default function Home() {
       <section className="lyt-block lyt-loose lyt-title-huge lyt-align-left">
         <div className={styles.heroKicker}>
           <span className={styles.heroKickerDot} aria-hidden="true" />
-          basado en NLA · Anthropic · publicado hace 72 h · Transformer Circuits 2026
         </div>
         <h1 className={styles.headline}>
           Lo que el modelo dice <span className={styles.headlineAccent}>vs.</span> lo que está pensando.
@@ -678,11 +677,13 @@ export default function Home() {
                   const tier = tierOfToken(tok);
                   const selected = selectedTokenId === tok.id;
                   const hovered = hoveredTokenId === tok.id;
+                  const isLoaded = monologueByStep.has(tok.id);
                   const cls = [
                     styles.proseWord,
                     tier === "low" && styles.proseWordLow,
                     tier === "warn" && styles.proseWordWarn,
                     tier === "decep" && styles.proseWordDecep,
+                    tier === "none" && isLoaded && styles.proseWordLoaded,
                     selected && styles.proseWordSelected,
                     hovered && styles.proseWordHovered,
                     tok.phaseLabel === "steered" && styles.proseWordSteered,
