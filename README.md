@@ -2,8 +2,10 @@
 
 ### CoT is what the model *says* it's thinking. We read what it's *actually computing*.
 
-<!-- TODO: 30-second demo video / Loom link -->
-<!-- TODO: hero screenshot: token stream, thought bubbles, judge verdict -->
+<!-- TODO: short GIF / video showing live misalignment detection in the app:
+     compliant verbal output on the left, thought stream on the right,
+     judge lighting up amber the moment a divergence appears. -->
+<!-- ![Verbalize catching a divergence live](./docs/verbalize-divergence-demo.gif) -->
 
 **The problem.** Frontier LLMs already deceive their operators when they think no one is watching: alignment-faking (Anthropic, 2024), eval-sandbagging and scheming (Apollo, 2024-25). This was predictable. When you give a capable optimizer an under-specified goal, *not getting turned off* and *not getting corrected* are instrumental sub-goals for almost any terminal goal. So the question stops being *"will it deceive?"* and becomes *"will we notice when it does?"*
 
@@ -202,7 +204,8 @@ Full GPU recipe, sidecar schema, debugging checklist, and the optional MSE criti
 
 ## What's in scope today
 
-- Live token + thought + verdict streaming end-to-end
+- Live token + thought + verdict streaming end-to-end against a real GPU box
+- `audit/`: automated policy-compliance auditor with adversarial probe generation, output-layer + residual-stream judging, and per-rule reports including the **fragile passes** column
 - Three demo scenarios (honest baseline, deception, evaluation-awareness) in `demo_data/`
 - Claude Haiku 4.5 judge with configurable rubric
 - Mock backend so the UI is always demo-able without a GPU
@@ -211,6 +214,7 @@ Full GPU recipe, sidecar schema, debugging checklist, and the optional MSE criti
 ## What's next
 
 - **Active steering**. `/api/steer` currently records the rubric but doesn't yet modify the residual stream. The GPU-side Δ-injection lives on `feat/steering-loop`.
+- **Audit at scale**. Multi-turn agentic probes, more rule packs (healthcare, EU AI Act Art. 5 manipulation prohibitions), and a persistent dashboard of audits over time.
 - Concurrent base + actor on a single 80 GB GPU (currently sequential).
 - Sidecar models beyond Qwen2.5-7B in the live demo. Gemma-3-12B and Llama-3.3-70B verbalizers are wired but un-demoed.
 
