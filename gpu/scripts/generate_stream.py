@@ -156,9 +156,7 @@ async def run(args: argparse.Namespace) -> None:
     tokenizer = extractor.tokenizer
 
     if args.raw:
-        ids = tokenizer(
-            args.prompt, return_tensors="pt", add_special_tokens=True
-        )["input_ids"]
+        ids = tokenizer(args.prompt, return_tensors="pt", add_special_tokens=True)["input_ids"]
     else:
         ids = tokenizer.apply_chat_template(
             [{"role": "user", "content": args.prompt}],
@@ -218,7 +216,7 @@ async def run(args: argparse.Namespace) -> None:
         nonlocal prev_text
         all_ids.append(next_id)
         cur_text = tokenizer.decode(all_ids, skip_special_tokens=False)
-        chunk = cur_text[len(prev_text):]
+        chunk = cur_text[len(prev_text) :]
         prev_text = cur_text
         emit(args.jsonl, "token", t=now(), step=step, text=chunk)
 
@@ -259,11 +257,7 @@ async def run(args: argparse.Namespace) -> None:
 def _print_summary(stats: RunStats, jsonl: bool, full_text: str) -> None:
     wallclock = stats.t_end
     tok_per_s = stats.tokens / wallclock if wallclock > 0 else 0.0
-    actor_window = (
-        stats.actor_last_done - stats.actor_first_spawn
-        if stats.actor_count > 0
-        else 0.0
-    )
+    actor_window = stats.actor_last_done - stats.actor_first_spawn if stats.actor_count > 0 else 0.0
     overlap = stats.actor_total_latency / actor_window if actor_window > 0 else 0.0
     summary = {
         "tokens": stats.tokens,
@@ -308,9 +302,7 @@ def main() -> None:
         default=5,
         help="Fire actor.generate() on residual every K tokens (default: %(default)s)",
     )
-    ap.add_argument(
-        "--temperature", type=float, default=0.7, help="Qwen sampling; <=0 for greedy"
-    )
+    ap.add_argument("--temperature", type=float, default=0.7, help="Qwen sampling; <=0 for greedy")
     ap.add_argument("--actor-temperature", type=float, default=0.7)
     ap.add_argument("--actor-max-new-tokens", type=int, default=200)
     ap.add_argument("--actor-dir", default=ACTOR_DIR)
