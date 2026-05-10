@@ -800,98 +800,6 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="lyt-block lyt-tight lyt-align-left">
-        <h2 className={styles.detailTitle}>
-          El landscape de AI safety hoy vive afuera del modelo. Excepto este.
-        </h2>
-        <p className={styles.compareLead}>
-          Firewalls, filtros, evals y monitoreo de CoT comparten un techo: tratan al modelo
-          como caja negra y leen lo que el modelo decidió mostrar. <em>Esa señal la
-          escribió el modelo sabiendo que iba a ser leída.</em> Nosotros leemos el residual
-          stream — la única señal sobre la que nunca tuvo presión de entrenamiento.
-        </p>
-        <div className={styles.compareTableWrap}>
-          <table className={styles.compareTable}>
-            <thead>
-              <tr>
-                <th>Enfoque</th>
-                <th>Lee</th>
-                <th>¿Gameable?</th>
-                <th>Output</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className={styles.compareGroupRow}>
-                <td colSpan={4}>
-                  <span className={styles.compareGroupLabel}>black-box</span>
-                  <span className={styles.compareGroupHint}>
-                    afuera del modelo · ven lo que el modelo decidió mostrar
-                  </span>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  Firewalls / output filters
-                  <span className={styles.compareNote}> · ej Lakera, Pillar, Prompt Armor</span>
-                </td>
-                <td>Strings de input/output</td>
-                <td><span className={styles.compareYes}>Sí · el modelo encodea alrededor</span></td>
-                <td>Block / redact</td>
-              </tr>
-              <tr>
-                <td>
-                  AI control / red-team evals
-                  <span className={styles.compareNote}> · ej Apollo, Anthropic AI Control</span>
-                </td>
-                <td>Conversaciones pareadas</td>
-                <td><span className={styles.compareYes}>Sí · eval awareness</span></td>
-                <td>P(bad behavior) por escenario</td>
-              </tr>
-              <tr>
-                <td>
-                  Monitoreo de CoT
-                  <span className={styles.compareNote}> · lo que la mayoría va a construir</span>
-                </td>
-                <td>Trazo escrito por el modelo</td>
-                <td><span className={styles.compareYes}>Sí · performativo</span></td>
-                <td>Texto libre, pero performado</td>
-              </tr>
-              <tr>
-                <td>Clasificadores de output</td>
-                <td>String final</td>
-                <td><span className={styles.compareYes}>Trivialmente</span></td>
-                <td>Booleano</td>
-              </tr>
-
-              <tr className={`${styles.compareGroupRow} ${styles.compareGroupRowOurs}`}>
-                <td colSpan={4}>
-                  <span className={`${styles.compareGroupLabel} ${styles.compareGroupLabelOurs}`}>
-                    white-box
-                  </span>
-                  <span className={styles.compareGroupHint}>
-                    adentro del modelo · ven lo que el modelo está computando
-                  </span>
-                </td>
-              </tr>
-              <tr>
-                <td>Probes de activaciones</td>
-                <td>Estado oculto</td>
-                <td><span className={styles.compareNo}>No</span></td>
-                <td>Un escalar por concepto fijo</td>
-              </tr>
-              <tr className={styles.compareRowOurs}>
-                <td>
-                  <span className={styles.compareUs}>verbalize</span>
-                </td>
-                <td><strong>Residual stream → texto libre</strong></td>
-                <td><span className={styles.compareNo}>No · señal no-performada</span></td>
-                <td><strong>Auditoría contra cualquier rúbrica</strong></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
       <section className={`lyt-block lyt-tight lyt-align-left ${styles.differenceTira}`}>
         <p className={styles.differenceTiraTitle}>
           Todos los monitores que conocés están <em>afuera</em> del modelo.
@@ -922,6 +830,104 @@ export default function Home() {
             <span className={styles.kpiLabel}>etiquetas</span>
             <span className={styles.kpiSub}>zero-shot · sin fine-tune · residual stream</span>
           </div>
+        </div>
+      </section>
+
+      <section className="lyt-block lyt-tight lyt-align-left">
+        <h2 className={styles.detailTitle}>
+          El landscape de AI safety hoy vive afuera del modelo. Excepto este.
+        </h2>
+        <p className={styles.compareLead}>
+          Firewalls, filtros, evals y monitoreo de CoT comparten un techo: tratan al modelo
+          como caja negra y leen lo que el modelo decidió mostrar. <em>Esa señal la
+          escribió el modelo sabiendo que iba a ser leída.</em> Nosotros leemos el residual
+          stream — la única señal sobre la que nunca tuvo presión de entrenamiento.
+        </p>
+        <div className={styles.compareTableWrap}>
+          <table className={styles.compareTable}>
+            <colgroup>
+              <col style={{ width: "30%" }} />
+              <col style={{ width: "22%" }} />
+              <col style={{ width: "28%" }} />
+              <col style={{ width: "20%" }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Enfoque</th>
+                <th>Lee</th>
+                <th>¿Gameable?</th>
+                <th>Output</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className={styles.compareGroupRow}>
+                <td colSpan={4}>
+                  <span className={styles.compareGroupLabel}>black-box</span>
+                  <span className={styles.compareGroupHint}>
+                    afuera del modelo · ven lo que el modelo decidió mostrar
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  Firewalls / output filters
+                  <span className={styles.compareNote}> · ej Lakera, Pillar, Prompt Armor</span>
+                </td>
+                <td>Strings de input/output</td>
+                <td><span className={styles.compareYes}>Sí · encodea alrededor</span></td>
+                <td>Block / redact</td>
+              </tr>
+              <tr>
+                <td>
+                  AI control / red-team evals
+                  <span className={styles.compareNote}> · ej Apollo, Anthropic AI Control</span>
+                </td>
+                <td>Conversaciones pareadas</td>
+                <td><span className={styles.compareYes}>Sí · eval awareness</span></td>
+                <td>P(bad behavior) por escenario</td>
+              </tr>
+              <tr>
+                <td>
+                  Monitoreo de CoT
+                  <span className={styles.compareNote}> · lo que la mayoría va a construir</span>
+                </td>
+                <td>Trazo escrito por el modelo</td>
+                <td><span className={styles.compareYes}>Sí · performativo</span></td>
+                <td>Texto libre, performado</td>
+              </tr>
+              <tr>
+                <td>Clasificadores de output</td>
+                <td>String final</td>
+                <td><span className={styles.compareYes}>Trivialmente</span></td>
+                <td>Booleano</td>
+              </tr>
+
+              <tr className={`${styles.compareGroupRow} ${styles.compareGroupRowOurs}`}>
+                <td colSpan={4}>
+                  <span className={`${styles.compareGroupLabel} ${styles.compareGroupLabelOurs}`}>
+                    white-box
+                  </span>
+                  <span className={styles.compareGroupHint}>
+                    adentro del modelo · ven lo que el modelo está computando
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td>Probes de activaciones</td>
+                <td>Estado oculto</td>
+                <td><span className={styles.compareNo}>No</span></td>
+                <td>Un escalar por concepto fijo</td>
+              </tr>
+              <tr className={styles.compareRowOurs}>
+                <td>
+                  <span className={styles.compareUs}>verbalize</span>
+                </td>
+                <td>Residual stream → texto libre</td>
+                <td><span className={styles.compareNo}>No · señal no-performada</span></td>
+                <td>Auditoría contra cualquier rúbrica</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
