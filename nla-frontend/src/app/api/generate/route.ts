@@ -5,7 +5,8 @@ export const dynamic = "force-dynamic";
 
 type ClientBody = {
   session_id: string;
-  prompt: string;
+  prompt?: string;
+  scenario_id?: string;
   system_prompt?: string;
   sniff_every_k?: number;
   model?: string;
@@ -24,13 +25,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
 
-  if (!body.session_id || !body.prompt) {
-    return NextResponse.json({ error: "session_id and prompt required" }, { status: 400 });
+  if (!body.session_id) {
+    return NextResponse.json({ error: "session_id required" }, { status: 400 });
+  }
+  if (!body.prompt && !body.scenario_id) {
+    return NextResponse.json(
+      { error: "either prompt or scenario_id required" },
+      { status: 400 }
+    );
+  }
+  if (body.prompt && body.scenario_id) {
+    return NextResponse.json(
+      { error: "prompt and scenario_id are mutually exclusive" },
+      { status: 400 }
+    );
   }
 
   const payload = {
     session_id: body.session_id,
-    prompt: body.prompt,
+    ...(body.prompt ? { prompt: body.prompt } : {}),
+    ...(body.scenario_id ? { scenario_id: body.scenario_id } : {}),
     system_prompt: body.system_prompt ?? null,
     sniff_every_k: body.sniff_every_k ?? 4,
     ...(body.model ? { model: body.model } : {}),
