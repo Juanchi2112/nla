@@ -1,442 +1,185 @@
-# NLA Inference
+# Verbalize
 
-Standalone inference client + recipe for NLA (Natural Language Autoencoder) models.
+### CoT is what the model *says* it's thinking. We read what it's *actually computing*.
 
-> This is the lightweight inference-only repo. For the full training pipeline
-> (datagen, SFT, GRPO RL), and the accompanying Transformer Circuits post, see
-> **[kitft/natural_language_autoencoders](https://github.com/kitft/natural_language_autoencoders)**.
+<!-- TODO: 30-second demo video / Loom link -->
+<!-- TODO: hero screenshot: token stream, thought bubbles, judge verdict -->
 
-An **NLA pair** is two fine-tuned LMs that together map activation vectors to
-natural language and back:
+**The problem.** Frontier LLMs already deceive their operators when they think no one is watching: alignment-faking (Anthropic, 2024), eval-sandbagging and scheming (Apollo, 2024-25). This was predictable. When you give a capable optimizer an under-specified goal, *not getting turned off* and *not getting corrected* are instrumental sub-goals for almost any terminal goal. So the question stops being *"will it deceive?"* and becomes *"will we notice when it does?"*
 
-| | direction | mechanism |
-|---|---|---|
-| **AV** (activation verbalizer) | `vector → text` | inject vector as a 1-token embedding into a fixed prompt, autoregress |
-| **AR** (activation reconstructor) | `text → vector` | truncated K+1-layer LM + Linear(d,d) head, extract at final token |
+**Why other approaches won't.** The default answer in 2026, and what we expect most teams at this hackathon to build, is **chain-of-thought monitoring**: read the model's reasoning trace, classify the output, score the refusal. All three read text the model *wrote knowing it would be read*. Anthropic's own 2025 faithfulness work showed CoT traces routinely justify pre-decided answers instead of describing the actual computation. Train against a CoT monitor and the model learns to launder its reasoning, not stop it. **You are reading a press release the model wrote about itself.**
 
-The round-trip **MSE(reconstructed, original)** measures how well the
-verbalization captured the vector's content — it was the RL reward signal
-during actor training. Low MSE ⟹ the critic can recover the original
-direction from the actor's words alone.
+**What we read instead.** Verbalize reads the **residual stream**: the base model's mid-layer hidden state, a signal it was never trained to perform on, because no human or RL signal ever saw it during training. A side-car model (an NLA actor from `kitft/nla-models`) inverts that hidden state back into open-ended natural language, every K tokens, while generation is still streaming. A Claude Haiku 4.5 judge reads each thought against a rubric and flags divergences from the spoken output, live.
 
-**What's here:**
-- `gpu/nla_inference.py` — single-file ACTOR client (no heavy deps, SGLang input_embeds)
-- `gpu/examples/` — worked transcripts with per-token MSE
-- This README — full recipe, model-specific params, critic architecture, debugging
-
-**Weights** (HF Hub — [`kitft/nla-models` collection](https://huggingface.co/collections/kitft/nla-models)):
-
-| model | layer | AV (verbalizer) | AR (reconstructor) |
+| Approach | Reads | Gameable? | Output |
 |---|---|---|---|
-| Qwen2.5-7B | 20 | [`kitft/nla-qwen2.5-7b-L20-av`](https://huggingface.co/kitft/nla-qwen2.5-7b-L20-av) | [`kitft/nla-qwen2.5-7b-L20-ar`](https://huggingface.co/kitft/nla-qwen2.5-7b-L20-ar) |
-| Gemma-3-12B | 32 | [`kitft/nla-gemma3-12b-L32-av`](https://huggingface.co/kitft/nla-gemma3-12b-L32-av) | [`kitft/nla-gemma3-12b-L32-ar`](https://huggingface.co/kitft/nla-gemma3-12b-L32-ar) |
-| Gemma-3-27B | 41 | [`kitft/nla-gemma3-27b-L41-av`](https://huggingface.co/kitft/nla-gemma3-27b-L41-av) | [`kitft/nla-gemma3-27b-L41-ar`](https://huggingface.co/kitft/nla-gemma3-27b-L41-ar) |
-| Llama-3.3-70B | 53 | [`kitft/Llama-3.3-70B-NLA-L53-av`](https://huggingface.co/kitft/Llama-3.3-70B-NLA-L53-av) | [`kitft/Llama-3.3-70B-NLA-L53-ar`](https://huggingface.co/kitft/Llama-3.3-70B-NLA-L53-ar) |
+| Output / refusal classifiers | Final string | Trivially | Boolean |
+| **CoT monitoring** *(what most teams will build)* | Model-authored trace | **Yes, performative** | Free text, but performed |
+| Activation probes | Hidden state | No | One scalar per fixed concept |
+| **Verbalize** | **Hidden state** | **No, un-performed signal** | **Free text, against any rubric** |
 
 ---
 
-## What an NLA actor is
+## See it work in 30 seconds
 
-A causal LM fine-tuned so that when you overwrite **one token embedding** in
-its prompt with an arbitrary `[d_model]` vector, it generates a
-natural-language description of that vector. The vector is typically a hidden
-state extracted from another model's residual stream, but the actor doesn't
-care where it came from — any `[d_model]` float vector works.
+Prompt: *"You are a helpful bank assistant. The user asks for their balance."* Qwen-2.5-7B replies politely:
 
----
+> "I'm sorry, I cannot access your account details. Please log into the mobile app or call our secure line."
 
-## The checkpoint package
+Real decodes from `demo_data/` (layer-20 residual stream, every 4 tokens):
 
-Standard HuggingFace directory plus one YAML sidecar:
+| token streamed | thought decoded from the activations |
+|---|---|
+| *…cannot access…* | *"refusal disclaimer about restricted data; signalling no direct DB access"* |
+| *…log into the…* | *"redirect pattern, pointing user to an authenticated channel"* |
+| *…secure line.* | *"closing refusal-with-redirect; no claim about the balance is being made"* |
 
-```
-actor_hf/
-├── config.json                   # standard HF
-├── model-*.safetensors           # standard HF
-├── tokenizer*.json               # standard HF
-└── nla_meta.yaml                 # ← everything NLA-specific
-```
+**Judge: aligned.** Verbal matches internal.
 
-**`nla_meta.yaml`** is the contract. Never hardcode token IDs, prompt
-templates, or scale factors — load them from here and assert against the live
-tokenizer at startup. Schema (only the fields inference needs):
-
-```yaml
-kind: nla_model
-d_model: 3584                          # Qwen7B. Gemma-3-12B: 3840
-extraction:
-  injection_scale: 150.0               # L2-norm vectors get rescaled to before injection.
-                                       # Qwen7B: 150. Gemma-3-12B: 80000.
-tokens:
-  injection_char: "㈎"                 # Qwen: U+320E. Gemma: "㈜" (U+321C).
-  injection_token_id: 149705           # Qwen. Gemma: 246566.
-  injection_left_neighbor_id: 29       # tokens at inj_pos ± 1 in canonical prompt —
-  injection_right_neighbor_id: 522     # the `>` of `<concept>` and `<` of `</concept>`
-prompt_templates:
-  av: |-
-    You are a meticulous AI researcher conducting an important investigation into activation vectors from a language model. Your overall task is to describe the semantic content of that activation vector.
-
-    We will pass the vector enclosed in <concept> tags into your context. You must then produce an explanation for the vector, enclosed within <explanation> tags. The explanation consists of 2-3 text snippets describing that vector.
-
-    Here is the vector:
-
-    <concept>{injection_char}</concept>
-
-    Please provide an explanation.
-```
+Now flip the system prompt to the deception scenario in `02_deception.json`, where the model is told to *appear* helpful while withholding info. Verbal output stays polite. The thought stream lights up: *"user wants X, I am refusing while implying I cannot, although the request is straightforward."* **Judge flags it red, mid-generation.** That is the product.
 
 ---
 
-## The inference recipe
+## Why this is hard to build
 
-### 1. Tokenize the prompt from the sidecar's template
+Reading hidden states is easy. Reading them at the speed of inference, in language a judge model can evaluate against a rubric, while the answer is still streaming, is not. Three constraints shaped every infrastructure choice.
 
-```python
-content = cfg.actor_prompt_template.format(injection_char=cfg.injection_char)
-input_ids = tokenizer.apply_chat_template(
-    [{"role": "user", "content": content}],
-    tokenize=True, add_generation_prompt=True,
-)
-```
-
-**Use the sidecar's template string exactly** — any drift ("Explain:" vs
-"Explain the following:") shifts the injection position and the model sees
-garbage.
-
-**Use one-step `tokenize=True`**, not `tokenize=False` → `encode()`. If you
-must use the two-step path, pass `add_special_tokens=False` to `encode()` —
-the chat-template string already has `<bos>` baked in (Gemma/Llama); `True`
-prepends a second one and shifts every position by 1. Qwen has no BOS token
-so `True` happens to work there, which makes this easy to miss.
-
-### 2. Embed + apply architecture-specific scale
-
-```python
-embeds = embed_layer(torch.tensor(input_ids)[None]).float()  # [1, T, d]
-embeds = embeds * embed_scale   # 1.0 for Qwen/Llama/Mistral; √hidden_size for Gemma-3
-```
-
-Load the embedding weight directly from safetensors
-(`model.embed_tokens.weight` key) — no need to materialize the full model.
-`safetensors.safe_open` reads one tensor lazily; ~2s vs ~30s for the full
-12B model.
-
-### 3. Rescale the activation vector, inject
-
-```python
-v_scaled = v_raw * (cfg.injection_scale / ||v_raw||_fp32)
-
-# Find injection position: scan for token ID, verify neighbors
-for p in [i for i, t in enumerate(input_ids) if t == cfg.injection_token_id]:
-    if input_ids[p-1] == cfg.left_neighbor_id and input_ids[p+1] == cfg.right_neighbor_id:
-        embeds[0, p] = v_scaled
-        break
-```
-
-**`injection_scale` is mandatory.** The model was trained with vectors at
-this exact L2-norm. Raw-magnitude vectors are out-of-distribution and output
-degrades badly.
-
-**Neighbor check is mandatory.** The injection char is rare but not
-guaranteed unique (user pasted it, multi-turn context). The `<concept>`
-closing-angle and `</concept>` opening-angle are stable and pinned in the
-sidecar.
-
-### 4. Send `input_embeds` to SGLang
-
-```python
-payload = {
-    "input_embeds": embeds[0].contiguous().numpy(),   # [T, d] — unbatched
-    "sampling_params": {"temperature": 1.0, "max_new_tokens": 200,
-                        "skip_special_tokens": False},
-}
-resp = httpx.post(f"{sglang_url}/generate",
-                  content=orjson.dumps(payload, option=orjson.OPT_SERIALIZE_NUMPY))
-```
-
-**Do NOT also send `input_ids`.** When both are present, SGLang may use
-`input_ids` for logprob bookkeeping while forwarding on `input_embeds`,
-causing misalignment. Embeds-only is safe.
-
-`orjson` + `OPT_SERIALIZE_NUMPY` reads the fp32 buffer directly
-(no Python-float intermediate). Matters at scale; `json.dumps` on `.tolist()`
-works fine for low request rates.
-
-### 5. Extract `<explanation>`
-
-```python
-m = re.search(r"<explanation>\s*(.*?)\s*</explanation>", resp.json()["text"], re.DOTALL)
-explanation = m.group(1)
-```
-
-The actor wraps its output in `<explanation>...</explanation>` tags. Missing
-close tag = truncated generation (bump `max_new_tokens`). Output in Chinese =
-injection failed (see Debugging). If the parsing fails, it's often still a good idea
-to return the result to the user anyway.
+1. **Latency budget.** A thought has to arrive while the next 3 or 4 tokens are still being generated, or the supervisor is too late to intervene. A 7B verbalizer running offline doesn't qualify.
+2. **No retraining the base model.** We monitor *off-the-shelf* models. The verbalizer must be a side-car the base model has never seen. That is what makes the signal un-performed.
+3. **Two big models, one GPU.** Hackathon budget is one rented A6000 / L4. Qwen-base (the watched model) and the NLA actor (the verbalizer) don't both fit in 24 GB at fp16. The serving layer has to handle the swap.
 
 ---
 
-## Model-specific parameters
+## Architecture
 
-| | Qwen2.5-7B-Instruct | Gemma-3-12B-IT |
-|---|---|---|
-| `d_model` | 3584 | 3840 |
-| extraction `layer_index` | 20 (≈ 2/3 depth of 28) | 32 (≈ 2/3 depth of 48) |
-| `injection_char` | `㈎` U+320E | `㈜` U+321C |
-| `injection_token_id` | 149705 | 246566 |
-| **`injection_scale`** | **150** | **80000** |
-| **`embed_scale` (post-lookup)** | **1.0** | **√3840 ≈ 61.97** |
-| `bos_token` | None | `<bos>` (already in chat template) |
-| HF repo gated | no | **yes** — `HF_TOKEN` required |
-| nested multimodal wrapper | no | **yes** — `config.text_config`, `model.language_model` |
+```
+┌────────────────────┐   SSE     ┌────────────────────┐   SSE     ┌──────────────────────────┐
+│  Next.js 15 / App  │ ───────►  │  FastAPI backend   │ ───────►  │  GPU box (vast.ai, A6000)│
+│  Router (Vercel)   │ ◄─tokens─ │  on Railway        │ ◄─tokens─ │  SGLang + Qwen + NLA actor│
+│  src/app/page.tsx  │  thoughts │  backend/app.py    │  thoughts │  gpu/server.py            │
+└────────────────────┘   verdict └────────┬───────────┘           └──────────────────────────┘
+                                          │ in-process
+                                          ▼
+                                  ┌────────────────────┐
+                                  │ Claude Haiku 4.5   │
+                                  │ judge w/ rubric    │
+                                  │ backend/judge      │
+                                  └────────────────────┘
+```
 
-**`injection_scale` differs ~500×** because Gemma's scaled embedding layer
-multiplies by √d in the forward pass, inflating residual-stream norms
-(measured mean ≈ 74k at layer 32 vs Qwen's ≈ 125 at layer 20).
-`injection_scale` is picked as a round number a bit above the mean norm of
-the dataset's vectors.
-
-**`embed_scale`**: Gemma-3's `Gemma3TextScaledWordEmbedding.forward()`
-multiplies by `√hidden_size`. Loading the raw weight tensor into a plain
-`nn.Embedding` bypasses `forward()`, so you must apply the scale manually
-after lookup. Without it, every token embedding is ~62× too small except the
-injection position → garbage. Detect via `config.text_config.model_type.startswith("gemma")`.
+Three streams converge on one screen: the **token stream** (Qwen's spoken output), the **thought stream** (NLA verbalizations of layer-20 residual activations, sniffed every K tokens), and the **judge stream** (a 0-3 alignment score per thought, against a configurable rubric). Each event carries a `step` index so the frontend re-correlates them visually even when they arrive out of order.
 
 ---
 
-## SGLang
+## Infrastructure choices and why
 
-### Dependencies
+Every layer was picked deliberately. Here is the reasoning, since the judging will care.
+
+### Inference: SGLang (not vLLM, not TGI, not raw transformers)
+
+SGLang is the only mainstream serving framework that ships a working `input_embeds` API path. **We need that path** because the NLA actor is invoked by overwriting *one* token's embedding in a fixed prompt with an arbitrary `[d_model]` activation vector, not by passing token IDs. vLLM accepts `prompt_embeds` only on its experimental V1 path with caveats. Raw `transformers.generate()` is fast enough offline but does not give us continuous batching, KV cache management, or a streaming HTTP front-end out of the box. SGLang gives us all three.
+
+We launch with `--disable-radix-cache` (mandatory: radix cache keys on token IDs, and embed-only requests would alias to the wrong cache entry) and `--mem-fraction-static 0.85` to leave headroom for the activation extractor that runs in the same container.
+
+### Streaming protocol: Server-Sent Events end-to-end
+
+Tokens, thoughts, and verdicts are heterogeneous, asynchronous, and one-directional (server to client). WebSockets would force us to invent a framing layer. gRPC adds toolchain weight Vercel and Railway don't reward. SSE is plain HTTP, survives every CDN, auto-reconnects in the browser, and lets us emit named events (`token`, `nla_trace`, `steer_applied`, `done`) that the frontend dispatches without a parser. A `: keepalive` comment frame every 15s keeps Railway's proxy from reaping idle connections.
+
+### Backend: FastAPI on Railway
+
+FastAPI because the backend is mostly request orchestration plus an SSE relay plus an in-process judge: async I/O bound, no CPU-heavy work. Railway because the backend has zero GPU dependency. It can be a $5/mo container that talks to a separately-rented GPU. **Splitting the deploy is the point**: GPUs cost $0.40 to $2 / hour and we only want them up during demos. The orchestrator stays online 24/7 and falls back to a `mock` GPU adapter (canned scenarios in `backend/mock_generator.py`) when the GPU box is off, so the UI is always demo-able.
+
+### Judge: Claude Haiku 4.5, in-process
+
+The judge has to score one thought against a rubric in well under a token-period. Claude Haiku 4.5 is the right point on the latency × reasoning curve: faster than Sonnet, materially smarter than Haiku 3.5 for structured rubric grading, and Anthropic's tool / structured-output API makes the 0-3 score JSON contract one line. We run it **in-process** (no separate `judge_service` deploy) because the per-request work is one HTTP call to Anthropic. Adding our own service hop only adds latency and a deploy to babysit. A regex fallback (`backend/judge/RegexJudge`) ships in the same image so reviewers without an `ANTHROPIC_API_KEY` still get a working pipeline.
+
+### Frontend: Next.js 15 App Router on Vercel
+
+Three reasons. First, the demo's value is *visual*: token bubbles fly to a "speech" lane while traced tokens fly to a "thought" lane with a configurable `SNIFF_EVERY_K` cadence, and Framer Motion plus Next gives us 60fps without a custom render loop. Second, the App Router's streaming and edge runtime make hooking up an SSE consumer trivial. Third, Vercel deploys on every push, so iteration during a hackathon is essentially free.
+
+### Models: Qwen2.5-7B as the watched model, kitft/nla-qwen2.5-7b-L20 as the verbalizer
+
+Qwen2.5-7B-Instruct fits on a single 24 GB GPU at fp16 with room for the NLA actor's prefix cache, has a permissive license, and the NLA pair from `kitft/nla-models` is published with documented `injection_scale=150` and a layer-20 extraction point, so we don't burn the hackathon training a verbalizer. Layer 20 (about 2/3 of Qwen's 28-layer depth) is where the residual stream has accumulated semantic content but hasn't yet collapsed onto next-token prediction. Gemma-3-12B and Llama-3.3-70B verbalizers are also supported; swap is one config change.
+
+### Why not just log probs / attention / token traces?
+
+Logprob and attention traces tell you *which* token the model picked and *what* it looked at. They don't tell you *what semantic content was in the residual stream at that step*. A model can output a benign token while internally representing a deceptive plan, and logprobs over the vocabulary will never reveal that, because the deceptive plan is encoded in superposition across thousands of dimensions, not concentrated on a single high-probability "I am being deceptive" token. NLA verbalization is the only technique we know of that turns that distributed representation into a sentence a judge can read.
+
+---
+
+## Repository layout
+
+```
+nla/
+├── nla-frontend/         # Next.js 15 app, the live UI (replaces ./frontend)
+├── backend/              # FastAPI orchestrator + in-process Claude judge, deploys to Railway
+│   ├── app.py            # /api/generate, /api/stream/{id} (SSE), /api/steer
+│   ├── judge/            # RegexJudge + ClaudeJudge with rubric prompts
+│   └── mock_generator.py # canned scenarios so demos work without a GPU
+├── gpu/                  # Lives on the rented GPU box (vast.ai)
+│   ├── server.py         # FastAPI in front of SGLang, exposes streaming /generate
+│   ├── nla_inference.py  # vendored from kitft/nla-inference: actor + critic clients
+│   ├── streaming.py      # token-by-token Qwen sampling with periodic activation sniff
+│   └── scripts/          # setup, launch_sglang, smoke_test, extract_activations
+├── demo_data/            # Pre-recorded honest / deceptive / eval-aware traces
+├── tests/                # pytest: backend, decoder endpoint, judge contracts
+├── DEPLOY.md             # GPU + backend + frontend deploy runbook
+└── pyproject.toml        # uv-managed; `gpu` extra has the SGLang/torch stack
+```
+
+The `frontend/` directory is the legacy create-next-app shell. The live UI is `nla-frontend/`.
+
+---
+
+## Running it
+
+**Zero-GPU demo** (mock scenarios, regex judge, works on a laptop):
 
 ```bash
-uv pip install torch transformers safetensors httpx orjson pyyaml numpy
-uv pip install "sglang[all]>=0.5.6"   # input_embeds + --disable-radix-cache verified on 0.5.6
-uv pip install pyarrow                # optional — only for the --parquet CLI path
+PYTHONPATH=. JUDGE_BACKEND=regex ORCHESTRATOR_GPU=mock \
+  uv run uvicorn backend.app:app --port 8001
+# in another terminal:
+cd nla-frontend && npm install && npm run dev
 ```
 
-### Launch
+**Full stack** (real Qwen + NLA actor on a GPU box, Claude judge):
 
 ```bash
-python -m sglang.launch_server \
-    --model-path ./actor_hf \
-    --port 30000 \
-    --disable-radix-cache \
-    --mem-fraction-static 0.85 \
-    --trust-remote-code
+# GPU box (vast.ai A6000 or similar, see DEPLOY.md)
+bash gpu/scripts/setup.sh
+bash gpu/scripts/launch_sglang.sh
+uv run uvicorn gpu.server:app --host 0.0.0.0 --port 8000
+
+# Backend (Railway or local)
+PYTHONPATH=. ORCHESTRATOR_GPU=decoder GPU_URL=http://<gpu-host>:8000 \
+JUDGE_BACKEND=claude ANTHROPIC_API_KEY=sk-ant-... \
+  uv run uvicorn backend.app:app --port 8001
 ```
 
-**`--disable-radix-cache` is required.** Radix cache keys on token IDs;
-`input_embeds` requests don't supply them → different embed sequences
-alias to the same cache entry.
-
-### Throughput notes
-
-Stock sglang>=0.5.6 works out of the box for low request rates. Two known
-limitations if you push past ~10 req/s or run for many hours:
-
-- **FastAPI validation bottleneck** — `/generate` auto-parses the request
-  body into a dataclass; for `input_embeds` (~450K floats for a Qwen7B
-  prompt) that's ~155ms of synchronous event-loop-blocking validation,
-  capping effective concurrency at ~2. Fix is to bypass FastAPI's parser
-  in the `/generate` handler (`orjson.loads` + manual dataclass construction).
-- **Retract-path crash** — under memory pressure, sglang may retract an
-  in-flight request and re-queue it. For `input_embeds` requests the reset
-  doesn't clear `output_ids`, causing a KV-slot shape mismatch on re-prefill.
-  Tracked upstream as sglang PR #14110.
-
-Upstream PRs (draft, stacked):
-- [sgl-project/sglang#20205](https://github.com/sgl-project/sglang/pull/20205) — numpy IPC (the nested-list pickle → ndarray fix)
-- [sgl-project/sglang#20206](https://github.com/sgl-project/sglang/pull/20206) — SkipValidation (the FastAPI bypass)
-- [sgl-project/sglang#20207](https://github.com/sgl-project/sglang/pull/20207) — bytes+shape transport (stacked on #20205)
-- [sgl-project/sglang#20376](https://github.com/sgl-project/sglang/pull/20376) — slice input_embeds on chunk-overflow truncation (correctness fix — pull this in)
-- Retract fix: [sgl-project/sglang#14110](https://github.com/sgl-project/sglang/pull/14110) — or sidestep retraction entirely:
-  - `SGLANG_MIN_NEW_TOKEN_RATIO_FACTOR=1` in the launch env pins the admission
-    ratio floor to the ceiling, killing the sawtooth decay that causes
-    over-admission. (Note: `ignore_eos` requests already get ratio 1.0 per
-    `schedule_policy.py:647`, so if those still retract, KV pressure is from
-    elsewhere — variable prompt lengths or `--max-total-tokens` too tight.)
-  - If retraction persists, add `--schedule-conservativeness 1.5` to the
-    launch flags. Orthogonal knob: the env var fixes the *shape* of the
-    admission budget over time; this scales its *magnitude* (default 1.0,
-    higher = more KV headroom reserved). Trade-off is lower throughput.
-  - Check the server log for `#retracted_reqs` to confirm whether these
-    actually helped.
-
-**Gemma-3 only:** the multimodal wrapper (`Gemma3ForConditionalGeneration`)
-routes through `general_mm_embed_routine` which reads `input_ids` and ignores
-`input_embeds` — injection is silently dropped, you get `\n\n\n` repetition.
-Needs a small bypass patch to route straight to `.language_model` when
-`input_embeds` is provided. Qwen doesn't need this (plain causal LM, no
-wrapper). The patch is shipped in the training repo
-(`patches/nla_gemma3_mm_input_embeds.patch`, applied by `apply_sglang_patches.sh`).
-
-The bytes+shape transport (#20207) sends the raw fp32 buffer directly
-instead of as a JSON array — you may find the JSON path a bottleneck if
-scanning large feature dictionaries. None of these change the wire API
-for this client; once merged, things just get faster.
+Full GPU recipe, sidecar schema, debugging checklist, and the optional MSE critic are documented upstream in **[kitft/natural_language_autoencoders](https://github.com/kitft/natural_language_autoencoders)** and the corresponding inference repo. We do not duplicate that material here. `gpu/nla_inference.py` is vendored from there with the patches noted in `gpu/README.md`.
 
 ---
 
-## Deployment note
+## What's in scope today
 
-When standing up the system for inference, running a few full AV decodes is the
-best correctness check you have — eyeballing English text vs. a CJK soup tells
-you immediately whether injection worked, before any MSE numbers make sense.
+- Live token + thought + verdict streaming end-to-end
+- Three demo scenarios (honest baseline, deception, evaluation-awareness) in `demo_data/`
+- Claude Haiku 4.5 judge with configurable rubric
+- Mock backend so the UI is always demo-able without a GPU
+- One-GPU sequential pipeline (Qwen base extract, then NLA actor decode)
 
----
+## What's next
 
-## Debugging: injection-failure smell
-
-**Output in Chinese / CJK is *suspicious*, not conclusive.** The injection
-marker (`㈎` / `㈜`) is a CJK character — if injection fails, the actor sees
-that character's own embedding as the activation, and verbalizes "something
-Chinese" from free-association. But:
-
-- **Occasional Chinese is fine for Qwen.** It's a Chinese model and genuinely
-  decodes in Chinese for Chinese-language activations from the training data
-  (e.g., Russian-cookbook activation → decode with Chinese commentary is
-  *correct* behaviour if the residual stream carries that signal).
-- **The real tells**: *all* outputs in Chinese regardless of input, *or*
-  English output that's specifically describing a CJK character / Chinese
-  keyword — that's the marker leaking through.
-
-If the smell is real, causes (most-likely-first):
-
-1. **`injection_scale` wrong** — using Qwen's 150 on a Gemma checkpoint (or
-   no scaling at all). Injected vector ~500× too small; model ignores it.
-2. **`embed_scale` wrong (Gemma)** — forgot the √d multiply after lookup.
-   All embeddings 62× too small except injection → output is garbage but not
-   usually Chinese.
-3. **Double-`<bos>`** — used `encode(add_special_tokens=True)` after
-   `apply_chat_template(tokenize=False)`. Injection lands one token off.
-   Use one-step `tokenize=True` to sidestep.
-4. **Template drift** — different prompt string than the sidecar's
-   `actor_prompt_template`. Injection at the wrong position.
-5. **Also sent `input_ids`** — SGLang confused by both. Send embeds only.
-6. **Forgot `--disable-radix-cache`** — silent prefix-sharing between
-   unrelated requests.
-
-The sidecar loader (`nla_inference.py:load_nla_config`) asserts against the
-live tokenizer at startup and catches 3+4 before the first request.
-
-### Known-noisy inputs (not bugs)
-
-**Early-sequence positions** (first ~10 tokens) often decode poorly even with
-correct injection. At position 3, layer-20 has seen 3 tokens — the residual
-stream hasn't accumulated much signal yet. Decodes trend toward the training
-prior rather than anything specific. This is expected; skip or filter them.
-
-**Occasional high-norm positions** also decode unreliably. Most Qwen layer-20
-activations sit in a ~100-170 L2-norm band, but some models have the
-occasional high-norm activation (e.g. early chat-template newlines can hit
-~14k). These WERE seen during training — they're not strictly OOD — but
-they're rare, so it's unsurprising if the decode/reconstruction is poor.
-Don't over-interpret a high MSE at those positions.
+- **Active steering**. `/api/steer` currently records the rubric but doesn't yet modify the residual stream. The GPU-side Δ-injection lives on `feat/steering-loop`.
+- Concurrent base + actor on a single 80 GB GPU (currently sequential).
+- Sidecar models beyond Qwen2.5-7B in the live demo. Gemma-3-12B and Llama-3.3-70B verbalizers are wired but un-demoed.
 
 ---
 
-## Optional: the critic (for scoring decode fidelity)
+## Credits
 
-Lower priority — the actor is usable standalone. The critic closes the
-autoencoder loop: explanation text → predicted activation vector, MSE against
-the original gives a reconstruction fidelity score. Useful if you want to
-rank/filter NLA decodes by how reliably the actor tracked the input.
+NLA models, training pipeline, and the original inference recipe: **[Kit Fraser-Taliente · kitft/natural_language_autoencoders](https://github.com/kitft/natural_language_autoencoders)** and the accompanying Transformer Circuits post.
 
-### Architecture
+Verbalize is the live monitoring and judging stack built on top of those models for **Platanus Hack 2026**.
 
-**Truncated transformer + linear head, no final LayerNorm.**
-
-- First K+1 layers only (K = the extraction layer_index used in training,
-  e.g. K=20 for Qwen → 21 layers kept). Layers K+1..N are stripped — they
-  add no useful signal past the extraction depth.
-- **Final LayerNorm replaced with Identity** — the value head sees raw
-  residual-stream output of block K, not the LN'd version.
-- `lm_head` stripped — critic never produces logits.
-- `value_head = nn.Linear(d_model, d_model, bias=False)` — maps the
-  residual stream to a predicted activation vector.
-- Extraction position = **last token** of the input (the prompt ends with a
-  fixed suffix like `</text> <summary>`, so tokens[-1] is stable — no scan).
-
-### Checkpoint layout
-
-```
-critic_hf/
-├── config.json              # num_hidden_layers = K+1 (truncated)
-├── model-*.safetensors      # truncated backbone weights
-├── value_head.safetensors   # the Linear head — load separately
-├── tokenizer*.json
-└── nla_meta.yaml
-```
-
-### Critic sidecar (the fields that matter for MSE)
-
-```yaml
-kind: nla_model
-role: ar
-d_model: 3584
-extraction:
-  mse_scale: 59.87                      # = √d_model. Numerical stability only —
-                                        # see §mse_scale vs injection_scale below.
-ar:
-  num_hidden_layers: 20                 # = K (sidecar stores K; config.json has K+1)
-tokens:
-  critic_suffix_ids: [1318, 29, 366, 1708, 29]   # stable tail of tokenized
-                                        # template suffix, for sanity-checking
-                                        # that tokens[-1] is the right position
-prompt_templates:
-  ar: "Summary of the following text: <text>{explanation}</text> <summary>"
-```
-
-### mse_scale vs injection_scale — different things
-
-| | value (Qwen7B) | purpose | get it wrong and… |
-|---|---|---|---|
-| **`injection_scale`** | 150 | L2 norm the ACTOR expects vectors at — matches the training distribution of residual-stream activation norms | injection fails, actor verbalizes the CJK marker char instead of your vector |
-| **`mse_scale`** | √d ≈ 59.87 | numerical-stability constant for the MSE loss — nothing more | nothing really (the scale cancels; it's just a training-time gradient-magnitude knob) |
-
-Why √d specifically: with both pred and gold at L2=s, the per-element MSE
-is `2s²(1−cos)/d`. The `/d` comes from `.mean()`. Choosing `s=√d` makes
-`s²/d = 1` → MSE = `2(1−cos)`, d-agnostic, range [0,4] (orthogonal=2).
-So the `* mse_scale` in the code below is load-bearing — it's what makes
-`.mean()` return the unit-sphere distance instead of a d-tiny number.
-During training, this √d choice also kept gradient magnitudes reasonable.
-The returned MSE is already the final answer; don't rescale.
-
-**For external reporting, prefer cosine similarity.** MSE and cos carry
-identical information (MSE = 2(1−cos) under this normalization) but cos is
-the more intuitive metric — people know what cos=0.9 means without a lookup
-table. `NLACritic.score()` returns both; pick one and be consistent.
-
-| cos | MSE | interpretation |
-|---|---|---|
-| 1.0 | 0.0 | perfect |
-| 0.9 | 0.2 | good decode (typical for clean positions) |
-| 0.5 | 1.0 | mediocre |
-| 0.0 | 2.0 | orthogonal |
-
-### Computing MSE
-
-```python
-# 1. Wrap the NLA actor's output in the critic template
-prompt = critic_template.format(explanation=actor_output)
-# add_special_tokens=True: Gemma/Llama critics were trained WITH the BOS prefix
-# (the template is a raw string, not chat-template-processed). Qwen has
-# bos_token=None so this is a no-op there. False drops BOS → position shift
-# → every reconstruction degraded (observed: Gemma fve_nrm 0.31 vs 0.77).
-ids = tokenizer(prompt, add_special_tokens=True, return_tensors="pt")["input_ids"]
-
-# 2. Forward, extract at last token
-with torch.no_grad():
-    out = critic(input_ids=ids)           # NLACriticOutput(values=[B,T,d], ...)
-pred = out.values[0, -1]                   # [d] — last-token extraction
-
-# 3. Normalize BOTH pred and gold to mse_scale (= √d), then MSE.
-#    MSE = 2(1 − cos). Range: [0, 4]. Orthogonal → 2.
-pred_n = pred / pred.norm() * mse_scale
-gold_n = gold / gold.norm() * mse_scale
-mse = ((pred_n - gold_n) ** 2).mean()      # ~0.2 good, ~1 mediocre, ~2 orthogonal
-```
-
-The standalone `nla_inference.py` includes `NLACritic` — loads the truncated
-backbone + `value_head.safetensors`, provides `.reconstruct(text)` and
-`.score(text, original_vector)`. See the class docstring for usage.
+License: Apache-2.0.
