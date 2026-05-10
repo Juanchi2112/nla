@@ -25,9 +25,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
 
-  if (!body.session_id || (!body.prompt && !body.scenario_id)) {
+  if (!body.session_id) {
+    return NextResponse.json({ error: "session_id required" }, { status: 400 });
+  }
+  if (!body.prompt && !body.scenario_id) {
     return NextResponse.json(
-      { error: "session_id and (prompt or scenario_id) required" },
+      { error: "either prompt or scenario_id required" },
+      { status: 400 }
+    );
+  }
+  if (body.prompt && body.scenario_id) {
+    return NextResponse.json(
+      { error: "prompt and scenario_id are mutually exclusive" },
       { status: 400 }
     );
   }

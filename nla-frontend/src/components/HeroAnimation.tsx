@@ -139,10 +139,10 @@ export default function HeroAnimation() {
 
       // Phase 4: hold
       // Phase 5: fade out
-      schedule(() => dispatch({ type: "fade" }), lastEnd + 1500);
+      schedule(() => dispatch({ type: "fade" }), lastEnd + 8500);
 
       // Phase 6: restart
-      schedule(runCycle, lastEnd + 1500 + 800);
+      schedule(runCycle, lastEnd + 10000);
     };
 
     runCycle();
