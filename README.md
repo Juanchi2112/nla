@@ -48,6 +48,18 @@ Reading hidden states is easy. Reading them at the speed of inference, in langua
 2. **No retraining the base model.** We monitor *off-the-shelf* models. The verbalizer must be a side-car the base model has never seen. That is what makes the signal un-performed.
 3. **Two big models, one GPU.** Hackathon budget is one rented A6000 / L4. Qwen-base (the watched model) and the NLA actor (the verbalizer) don't both fit in 24 GB at fp16. The serving layer has to handle the swap.
 
+## GPU deployment: what actually broke
+
+Getting two 7B-class models to cooperate on a single GPU, with low-latency streaming, was most of the engineering work. The difficulties below are not hypothetical.
+
+**The `input_embeds` path in SGLang was barely production-ready.** Invoking the NLA actor requires overwriting one token embedding with the raw activation vector before the forward pass, which means we cannot use the standard token-ID API. SGLang is the only mainstream inference server that exposes this at all. But the implementation had two serious bugs when we hit it. First, the FastAPI request validator deserializes the full embedding matrix on every call: for a Qwen 7B prompt (~450K floats), that blocks the event loop for about 155ms and caps effective concurrency at 2. We worked around it and have a draft upstream PR open. Second, under memory pressure SGLang sometimes retracts an in-flight request and re-queues it; for `input_embeds` requests the reset does not clear `output_ids`, causing a KV-slot shape mismatch on re-prefill. We filed that as a separate upstream issue and sidestepped it with `SGLANG_MIN_NEW_TOKEN_RATIO_FACTOR=1`.
+
+**VRAM budgeting is a precise arithmetic problem.** `gpu/server.py` loads Qwen base in-process (roughly 14 GiB at bf16) alongside SGLang serving the NLA actor. SGLang's default `--mem-fraction-static 0.85` leaves no room: `from_pretrained` for Qwen crashes with CUDA out of memory before the first request. We set `MEM_FRAC=0.5` in production, which leaves the GPU split roughly in half between the two models. Getting that number wrong in either direction either crashes on startup or causes SGLang to start retracting requests under load.
+
+**Caching in SGLang silently corrupts results.** Radix cache in SGLang keys on token IDs. Because our requests pass embeddings directly and carry no token IDs, different activation vectors from different positions alias to the same cache entry and the wrong verbalization is returned with no error. The flag is `--disable-radix-cache` and it is mandatory. It is also not documented anywhere as a requirement for `input_embeds` usage; we found it by observing that the same output was being returned for semantically unrelated activation vectors.
+
+**Model-specific injection parameters are not interchangeable.** The NLA actor expects activation vectors normalized to a specific L2 norm (`injection_scale`). For Qwen 7B that is 150; for Gemma 3 12B it is 80,000, because Gemma's scaled embedding layer inflates residual stream norms by roughly 500x. Using the wrong scale causes the injected vector to be out-of-distribution for the actor, and the output degrades to the actor verbalizing its own injection-marker character rather than the activation. This fails silently: the output is grammatical English, but it describes the wrong thing. Gemma also requires a one-off SGLang patch because its multimodal wrapper ignores `input_embeds` entirely and routes to `input_ids`, so injection is silently dropped.
+
 ---
 
 ## Architecture
