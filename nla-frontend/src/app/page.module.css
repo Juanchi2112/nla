@@ -875,10 +875,10 @@
 
 .tokenChipBig {
   font-family: var(--font-mono);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   background: var(--bg-alt-translucent); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border);
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: var(--radius-sm);
 }
 
@@ -890,7 +890,7 @@
 
 .scoreBadgeBig {
   font-family: var(--font-mono);
-  font-size: 32px;
+  font-size: 18px;
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
 }
@@ -924,7 +924,7 @@
 
 .monologueText {
   font-family: var(--font-serif);
-  font-size: var(--text-lg);
+  font-size: var(--text-sm);
   font-style: italic;
   line-height: var(--leading-normal);
   color: var(--fg);
@@ -935,6 +935,26 @@
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
+}
+
+/* ========== INSPECTION LAYOUT (side-by-side) ========== */
+.inspectionLayout {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.inspectionLeft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+@media (max-width: 1000px) {
+  .inspectionLayout {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ========== BOTTOM STRIP (post-stream inspection) ========== */
@@ -1326,6 +1346,9 @@
   overflow-y: auto;
   white-space: pre-wrap;
 }
+
+/* ========== STEERING PIPELINE ========== */
+/* === STEERING PIPELINE HERO VISUALIZATION === */
 
 .deltaBanner {
   margin-top: var(--space-md);

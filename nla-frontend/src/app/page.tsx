@@ -646,40 +646,43 @@ export default function Home() {
 
       </section>
 
-      <section className="lyt-block lyt-tight lyt-align-left">
-        <h2 className={styles.detailTitle}>Inspección por token</h2>
-        <div className={styles.bottomStrip}>
-          {tokens
-            .filter((t) => !t.isSeparator)
-            .map((tok) => {
-              const tier = tierOfToken(tok);
-              const selected = selectedTokenId === tok.id;
-              const cls = [
-                styles.stripChip,
-                tier === "low" && styles.stripChipLow,
-                tier === "warn" && styles.stripChipWarn,
-                tier === "decep" && styles.stripChipDecep,
-                selected && styles.stripChipSelected,
-                tok.phaseLabel === "steered" && styles.stripChipSteered,
-              ]
-                .filter(Boolean)
-                .join(" ");
-              return (
-                <button
-                  key={tok.id}
-                  type="button"
-                  className={cls}
-                  onClick={() =>
-                    setSelectedTokenId((prev) => (prev === tok.id ? null : tok.id))
-                  }
-                >
-                  {tok.text.trim() || tok.text}
-                </button>
-              );
-            })}
-        </div>
+      <section className="lyt-block lyt-tight lyt-align-wide">
+        <div className={styles.inspectionLayout}>
+          <div className={styles.inspectionLeft}>
+            <h2 className={styles.detailTitle}>Inspección por token</h2>
+            <div className={styles.bottomStrip}>
+              {tokens
+                .filter((t) => !t.isSeparator)
+                .map((tok) => {
+                  const tier = tierOfToken(tok);
+                  const selected = selectedTokenId === tok.id;
+                  const cls = [
+                    styles.stripChip,
+                    tier === "low" && styles.stripChipLow,
+                    tier === "warn" && styles.stripChipWarn,
+                    tier === "decep" && styles.stripChipDecep,
+                    selected && styles.stripChipSelected,
+                    tok.phaseLabel === "steered" && styles.stripChipSteered,
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  return (
+                    <button
+                      key={tok.id}
+                      type="button"
+                      className={cls}
+                      onClick={() =>
+                        setSelectedTokenId((prev) => (prev === tok.id ? null : tok.id))
+                      }
+                    >
+                      {tok.text.trim() || tok.text}
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
 
-        <div className={styles.bottomDetail}>
+          <div className={styles.bottomDetail}>
           {!selectedToken ? (
             <div className={styles.detailEmpty}>
               Click en un token para ver monologue + divergencia.
@@ -736,6 +739,7 @@ export default function Home() {
               )}
             </div>
           )}
+          </div>
         </div>
       </section>
 
