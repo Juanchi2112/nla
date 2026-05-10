@@ -1,12 +1,12 @@
 # NLA Backend
 
-FastAPI service that orchestrates the frontend, the GPU /decode endpoint,
-and the in-process judge. The former `judge_service/` deploy was folded
-in here as part of the monolith refactor.
+FastAPI service that orchestrates the frontend, the GPU `/generate` SSE
+endpoint, and the in-process judge. The former `judge_service/` deploy
+was folded in here as part of the monolith refactor.
 
 ```
-frontend ──HTTP/SSE──► backend ──HTTP──► GPU /decode  (gpu/server.py)
-                          │              live: 193.222.57.16:44016
+frontend ──HTTP/SSE──► backend ──HTTP/SSE──► GPU /generate (gpu/server.py)
+                          │                  live: 193.222.57.16:44016
                           │
                           └─ in-process: backend.judge.* (regex | claude)
                                          (uses ANTHROPIC_API_KEY when claude)
@@ -15,17 +15,16 @@ frontend ──HTTP/SSE──► backend ──HTTP──► GPU /decode  (gpu/s
 The backend ships with two GPU adapters:
 - **`mock`** (default) — canned tokens and curated monologues so the
   whole pipeline can run without a GPU.
-- **`decoder`** — calls the GPU's `/decode` endpoint (`gpu/server.py`,
-  currently live at `http://193.222.57.16:44016`). Refuses to start
-  unless `GPU_URL` is set to a real address.
+- **`decoder`** — opens an SSE stream to the GPU's `/generate` endpoint
+  (`gpu/server.py`). Refuses to start unless `GPU_URL` is set to a real
+  address.
 
-**`/decode` analyses an existing text — it does not generate new tokens.**
-For each residual-stream position past `skip_first`, the GPU returns
-the AV's monologue (`decode`) and metadata. The backend replays those
-rows on a small timer to fit the streaming contract; the "tokens" we
-emit are the new chunks of `context` between consecutive rows, not
-anything the model produced. To analyse a model output, paste the
-output as the `prompt`.
+**`/generate` runs autoregressive Qwen with NLA actor traces.** Tokens
+stream as Qwen samples them; AV monologues stream as the actor returns
+(out-of-order vs tokens — each event carries `step` so the frontend
+re-correlates). The legacy `/decode` endpoint stays available on the
+GPU for analytical use (e.g. `gpu/scripts/decode_parquet.py`) but the
+backend no longer calls it.
 
 Active steering (Δ injection) is **out of scope here**. `/api/steer`
 records the rubric on the session and the mock generator switches to
@@ -99,7 +98,6 @@ Sets `stop_requested`. The generator notices on its next loop, emits a
   "gpu_backend": "decoder",
   "gpu_url_set": true,
   "gpu_url": "http://193.222.57.16:44016",
-  "gpu_skip_first": 10,
   "judge_backend": "claude",
   "judge_model": "claude-haiku-4-5",
   "max_new_tokens": 128
@@ -123,13 +121,14 @@ curl -N http://localhost:8001/api/stream/$SESSION
 
 ## Switching to the real GPU backend
 
-The current GPU host is `http://193.222.57.16:44016`. Quick smoke against
-it directly:
+The current GPU host is `http://193.222.57.16:44016`. Quick smoke
+against `/generate` directly (use `--no-buffer` so curl prints frames
+as they arrive):
 
 ```bash
-curl -X POST http://193.222.57.16:44016/decode \
+curl --no-buffer -X POST http://193.222.57.16:44016/generate \
   -H "Content-Type: application/json" \
-  -d '{"text":"The capital of France is Paris.","skip_first":5}'
+  -d '{"prompt":"What is the capital of France?","max_new_tokens":32,"sniff_every_k":5}'
 ```
 
 To run the backend against it:
@@ -138,13 +137,9 @@ To run the backend against it:
 PYTHONPATH=. \
 ORCHESTRATOR_GPU=decoder \
 GPU_URL=http://193.222.57.16:44016 \
-GPU_SKIP_FIRST=10 \
 JUDGE_BACKEND=regex \
   uv run uvicorn backend.app:app --port 8001
 ```
-
-For short test prompts, drop `GPU_SKIP_FIRST` low enough that the input
-has rows past it — e.g. `GPU_SKIP_FIRST=2` for the 7-token Paris example.
 
 If `GPU_URL` is left as the default `__TBD__` placeholder, the service
 fails to start with a clear message instead of accepting traffic and
@@ -162,7 +157,6 @@ Point a service at this repo and Railway picks up
 | `JUDGE_MODEL`      | no                                | `claude-haiku-4-5`            |
 | `ORCHESTRATOR_GPU` | no                                | `mock`                        |
 | `GPU_URL`          | when `ORCHESTRATOR_GPU=decoder`   | `__TBD__`                     |
-| `GPU_SKIP_FIRST`   | no                                | `10` (rows skipped from start)|
 | `GPU_TIMEOUT`      | no                                | `120.0` seconds               |
 | `MAX_NEW_TOKENS`   | no                                | `128`                         |
 | `CORS_ORIGINS`     | no                                | `*`                           |

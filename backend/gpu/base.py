@@ -21,13 +21,21 @@ from dataclasses import dataclass
 class GPUStreamItem:
     """One step of the generation stream.
 
-    `token`: text fragment to forward to the SSE consumer.
-    `monologue`: AV decoding at this position. Present only on sniff
-        steps (every K tokens); None on plain token steps.
+    Either `token`, `monologue`, or both may be set on a given item.
+    Real-streaming GPUs (gpu/server.py /generate) emit them independently
+    because actor traces arrive out-of-order vs Qwen's tokens; legacy clients
+    (mock, /decode replay) set both at once. Consumers must check each field.
+
+    `step`: the residual-stream position this item corresponds to. Tokens and
+        their later-arriving monologue trace share a step number.
+    `token`: text fragment from Qwen at this step. None for monologue-only
+        items (the trace for an earlier step that's still in flight).
+    `monologue`: AV decoding of the residual at this step. Present on sniff
+        steps (every K tokens); None on plain token-only steps.
     """
 
     step: int
-    token: str
+    token: str | None = None
     monologue: str | None = None
 
 

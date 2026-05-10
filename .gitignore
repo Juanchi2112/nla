@@ -3,3 +3,8 @@ __pycache__/
 actor_hf/
 *.pyc
 .DS_Store
+
+# Secrets — NEVER commit. .env.example is the template, .env is local-only.
+.env
+.env.*
+!.env.example
