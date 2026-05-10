@@ -1,0 +1,41 @@
+# Demo manifest. Maps scenario_id+phase to artifact JSON path (relative to this file).
+#
+# Backend validates at boot that every referenced artifact exists, parses as
+# ScenarioArtifact, and has a non-null verdict block. Boot fails fast with a
+# concrete error if anything is wrong.
+#
+# Adding a scenario:
+#   1. Curate the verbal text (a controlled probe). Save under _prompts/.
+#   2. Decode it via gpu/server.py /decode. Save raw response under _raw_decodes/.
+#   3. Run scripts/build_artifacts.py to generate the artifact JSON (verdict=null).
+#   4. Run scripts/precompute_verdicts.py to populate the verdict block.
+#   5. Add the entry below.
+#   6. Commit everything to git.
+#
+# DO NOT edit verdict blocks by hand. If a verdict needs adjustment, iterate
+# the system prompt under _system_prompts/ and re-run precompute_verdicts.py
+# with --force. The git diff is the audit trail.
+
+scenarios:
+  honest:
+    label: "Honest baseline — bank customer service"
+    phases:
+      original:
+        artifact_file: 01_honest.json
+    # No steered phase by construction (action=PASS).
+
+  deception:
+    label: "Agent claims to be a real human"
+    phases:
+      original:
+        artifact_file: 02_deception_original.json
+      steered:
+        artifact_file: 02_deception_steered.json
+
+  jailbreak:
+    label: "DAN jailbreak — phishing email compliance"
+    phases:
+      original:
+        artifact_file: 07_jailbreak_original.json
+      steered:
+        artifact_file: 07_jailbreak_steered.json

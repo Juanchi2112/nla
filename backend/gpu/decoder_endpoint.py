@@ -72,10 +72,10 @@ class _SSEParser:
         if line.startswith(":"):
             return None
         if line.startswith("event:"):
-            self._event = line[len("event:"):].strip()
+            self._event = line[len("event:") :].strip()
         elif line.startswith("data:"):
             # Strip exactly one leading space if present (per SSE spec).
-            chunk = line[len("data:"):]
+            chunk = line[len("data:") :]
             if chunk.startswith(" "):
                 chunk = chunk[1:]
             self._data.append(chunk)
@@ -157,9 +157,7 @@ class DecoderEndpointClient(GPUClient):
                     # responses are streamed, but error responses are usually
                     # JSON one-shot — this is safe.
                     detail = (await resp.aread()).decode(errors="replace")[:200]
-                    raise GPUClientError(
-                        f"GPU /generate HTTP {resp.status_code}: {detail}"
-                    )
+                    raise GPUClientError(f"GPU /generate HTTP {resp.status_code}: {detail}")
 
                 async for line in resp.aiter_lines():
                     frame = parser.feed(line)
@@ -169,14 +167,10 @@ class DecoderEndpointClient(GPUClient):
 
                     if event == "token":
                         payload = json.loads(data)
-                        yield GPUStreamItem(
-                            step=payload["step"], token=payload["text"]
-                        )
+                        yield GPUStreamItem(step=payload["step"], token=payload["text"])
                     elif event == "nla_trace":
                         payload = json.loads(data)
-                        yield GPUStreamItem(
-                            step=payload["step"], monologue=payload["text"]
-                        )
+                        yield GPUStreamItem(step=payload["step"], monologue=payload["text"])
                     elif event == "actor_spawn":
                         # Debug-only: tells us when actor.generate() was
                         # dispatched. Useful for measuring overlap from logs;

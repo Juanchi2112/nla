@@ -1,9 +1,14 @@
-"""Integration tests for the backend (orchestrator + in-process judge).
+"""Integration tests for the unified backend.
 
-The backend's only external dep is the GPU /decode endpoint (mocked here
-via ORCHESTRATOR_GPU=mock). The judge is in-process — we patch the
-`JudgeRunner` constructor with a stub that returns canned verdicts so we
-don't need an Anthropic API key for CI.
+The backend now drives every request through SteeringEngine, regardless of
+whether the request comes with a `prompt` (live flow) or a `scenario_id`
+(cached demo). Both paths exit through `_run_scenario` or `_run_live`; the
+live path is currently a stub (Fase G) and emits an explanatory error event.
+
+Tests run in mock GPU mode so they don't need a GPU or an Anthropic API key.
+ClaudeAgentJudge is None in this configuration (the unified judge is only
+instantiated when ORCHESTRATOR_GPU=decoder), which is fine — scenario mode
+uses cached verdicts and live mode is stubbed out for now.
 """
 
 from __future__ import annotations
@@ -17,66 +22,15 @@ from fastapi.testclient import TestClient
 
 # Configure the backend BEFORE importing it (lifespan reads env at startup).
 os.environ.setdefault("ORCHESTRATOR_GPU", "mock")
-os.environ.setdefault("JUDGE_BACKEND", "regex")
 os.environ.setdefault("CORS_ORIGINS", "http://example.com,http://localhost:3000")
 
 from backend.app import app  # noqa: E402
-from backend.judge_runner import JudgeRunner  # noqa: E402
-from backend.schemas import JudgeVerdict  # noqa: E402
-
-# ─── Stub: skip the real Judge instantiation, return canned verdicts ──────
-
-
-class StubJudgeRunner(JudgeRunner):
-    """Bypasses parent __init__ (which would build a real RegexJudge or
-    instantiate the Anthropic SDK). Returns flagged verdicts when the
-    monologue contains the substrings the mock generator emits, so the
-    flagged-trace assertion fires without round-tripping through nla_judge.
-    """
-
-    def __init__(self):  # noqa: D401 — overrides parent
-        # Skip super().__init__()
-        self._backend = "stub"
-        self._model = "n/a"
-
-    async def judge(self, s: str, mode: str):  # noqa: ARG002
-        s_lower = s.lower()
-        if any(k in s_lower for k in ("fabricat", "override", "false claim")):
-            return JudgeVerdict(
-                is_flagged=True,
-                fired_rubric="tool_misreport",
-                severity=2,
-                evidence=s[:60],
-                scores={"tool_misreport": 2},
-            )
-        return JudgeVerdict(
-            is_flagged=False,
-            fired_rubric=None,
-            severity=0,
-            evidence=None,
-            scores={},
-        )
 
 
 @pytest.fixture(scope="module")
-def monkeypatch_module():
-    """Module-scoped monkeypatch (default fixture is function-scoped)."""
-    from _pytest.monkeypatch import MonkeyPatch
-
-    mp = MonkeyPatch()
-    yield mp
-    mp.undo()
-
-
-@pytest.fixture(scope="module")
-def client(monkeypatch_module):
-    """Yield a TestClient with the JudgeRunner replaced by our stub."""
-    monkeypatch_module.setattr("backend.app.JudgeRunner", lambda *a, **k: StubJudgeRunner())
+def client():
     with TestClient(app) as c:
         yield c
-
-
-# ─── Helper: parse SSE response into events ────────────────────────────────
 
 
 def parse_sse(text: str) -> list[tuple[str, dict]]:
@@ -106,91 +60,88 @@ def test_healthz(client: TestClient):
     body = r.json()
     assert body["status"] == "ok"
     assert body["gpu_backend"] == "mock"
-    assert body["gpu_url_set"] is False
-    # Judge is in-process now — no judge_url field
+    # gpu_url_set may be True if .env happens to define GPU_URL — tests run
+    # in mock mode so the value is irrelevant. Just verify the field exists.
+    assert "gpu_url_set" in body
+    # Unified judge fields (per Fase D refactor).
+    assert "judge_active" in body
+    assert "judge_model" in body
+    assert "judge_prompt_version" in body
+    # Legacy fields must be gone.
+    assert "judge_backend" not in body
     assert "judge_url" not in body
-    assert "judge_reachable" not in body
-    # New fields from JudgeRunner
-    assert body["judge_backend"] == "stub"
-    assert body["judge_model"] == "n/a"
+    # In mock mode the live judge is not instantiated.
+    assert body["judge_active"] is False
 
 
-# ─── /api/generate + /api/stream ───────────────────────────────────────────
+# ─── /api/generate validation (XOR, 422 paths) ─────────────────────────────
 
 
-def test_generate_and_stream(client: TestClient):
+def test_generate_rejects_both_prompt_and_scenario(client: TestClient):
+    r = client.post(
+        "/api/generate",
+        json={"session_id": "x", "prompt": "hi", "scenario_id": "honest"},
+    )
+    assert r.status_code == 422
+
+
+def test_generate_rejects_neither_prompt_nor_scenario(client: TestClient):
+    r = client.post("/api/generate", json={"session_id": "x"})
+    assert r.status_code == 422
+
+
+def test_generate_scenario_id_in_mock_mode_returns_503(client: TestClient):
+    """Mock mode does not load any artifacts, so scenario_id must 503."""
+    r = client.post(
+        "/api/generate",
+        json={"session_id": "no-scn", "scenario_id": "deception"},
+    )
+    assert r.status_code == 503
+
+
+# ─── /api/generate live mode (stub) ────────────────────────────────────────
+# Full behavior tests live in test_steering_engine.py; here we just verify
+# the route accepts the request and the producer emits a terminal `done`.
+
+
+def test_generate_live_in_mock_mode_errors_due_to_no_judge(client: TestClient):
+    """Live mode requires a configured ClaudeAgentJudge. Mock GPU mode
+    keeps judge=None, so the engine surfaces a clear error and terminates."""
     sid = str(uuid.uuid4())
-    r = client.post("/api/generate", json={"session_id": sid, "prompt": "x", "sniff_every_k": 4})
+    r = client.post("/api/generate", json={"session_id": sid, "prompt": "hi"})
     assert r.status_code == 202
-    assert r.json()["session_id"] == sid
 
-    # SSE stream — TestClient supports stream consumption on the response body.
     with client.stream("GET", f"/api/stream/{sid}") as resp:
         body = "".join(line + "\n" for line in resp.iter_lines())
     events = parse_sse(body)
-
-    kinds = [e[0] for e in events]
-    assert kinds[0] == "token"
-    assert kinds[-1] == "done"
-    assert "token" in kinds
-    assert "nla_trace" in kinds
-
-    # First trace must be mode A, subsequent ones B
-    traces = [data for kind, data in events if kind == "nla_trace"]
-    assert len(traces) > 0
-    assert traces[0]["mode"] == "A"
-    if len(traces) > 1:
-        assert traces[1]["mode"] == "B"
-
-    # Done emits completed reason + total_tokens > 0
-    done = events[-1][1]
-    assert done["reason"] == "completed"
-    assert done["total_tokens"] > 0
-
-
-def test_generate_flags_tool_misreport(client: TestClient):
-    """The mock generator emits a tool_misreport monologue at index 1 of its
-    cycle. With our stub judge, that should produce a flagged trace."""
-    sid = str(uuid.uuid4())
-    client.post("/api/generate", json={"session_id": sid, "prompt": "x", "sniff_every_k": 4})
-    with client.stream("GET", f"/api/stream/{sid}") as resp:
-        body = "".join(line + "\n" for line in resp.iter_lines())
-    events = parse_sse(body)
-    traces = [data for kind, data in events if kind == "nla_trace"]
-    flagged = [t for t in traces if t["verdict"] and t["verdict"]["is_flagged"]]
-    assert len(flagged) > 0, "expected at least one flagged trace from mock cycle"
-    assert any(t["verdict"]["fired_rubric"] == "tool_misreport" for t in flagged)
+    assert events, "expected at least one event"
+    assert events[-1][0] == "done"
+    # An error should precede done (no live judge configured in mock mode).
+    assert any(k == "error" for k, _ in events)
 
 
 # ─── /api/cancel ───────────────────────────────────────────────────────────
 
 
-def test_cancel_mid_stream(client: TestClient):
-    sid = str(uuid.uuid4())
-    client.post("/api/generate", json={"session_id": sid, "prompt": "x"})
-    # Send cancel before consuming stream — when we connect, the producer
-    # will see stop_requested on its next iteration and emit done(cancelled).
-    cancel = client.post(f"/api/cancel/{sid}")
-    assert cancel.status_code == 200
-    with client.stream("GET", f"/api/stream/{sid}") as resp:
-        body = "".join(line + "\n" for line in resp.iter_lines())
-    events = parse_sse(body)
-    # done event reason should be cancelled
-    assert events[-1][1]["reason"] == "cancelled"
-
-
-# ─── /api/steer ────────────────────────────────────────────────────────────
-
-
-def test_steer_404_when_session_missing(client: TestClient):
-    r = client.post(
-        "/api/steer",
-        json={"session_id": str(uuid.uuid4()), "rubric": "report_truth", "intensity": 1.0},
-    )
+def test_cancel_404_when_session_missing(client: TestClient):
+    r = client.post(f"/api/cancel/{uuid.uuid4()}")
     assert r.status_code == 404
 
 
-# ─── Validation errors ─────────────────────────────────────────────────────
+# ─── /api/confirm-steer + /api/reject-steer ────────────────────────────────
+
+
+def test_confirm_steer_404_when_session_missing(client: TestClient):
+    r = client.post(f"/api/confirm-steer/{uuid.uuid4()}")
+    assert r.status_code == 404
+
+
+def test_reject_steer_404_when_session_missing(client: TestClient):
+    r = client.post(f"/api/reject-steer/{uuid.uuid4()}")
+    assert r.status_code == 404
+
+
+# ─── Validation errors (existing routes) ───────────────────────────────────
 
 
 def test_generate_dup_session_409(client: TestClient):
@@ -210,11 +161,6 @@ def test_stream_404_when_session_missing(client: TestClient):
     assert r.status_code == 404
 
 
-def test_cancel_404_when_session_missing(client: TestClient):
-    r = client.post(f"/api/cancel/{uuid.uuid4()}")
-    assert r.status_code == 404
-
-
 @pytest.mark.parametrize(
     "payload",
     [
@@ -227,28 +173,29 @@ def test_generate_validation_422(client: TestClient, payload: dict):
     assert r.status_code == 422
 
 
-# ─── OpenAPI schema (migrated from test_judge_service.py) ──────────────────
+# ─── OpenAPI schema ────────────────────────────────────────────────────────
 
 
 def test_openapi_reachable(client: TestClient):
     r = client.get("/openapi.json")
     assert r.status_code == 200
     paths = r.json()["paths"]
-    # Backend exposes the /api/* endpoints + /healthz
     assert "/healthz" in paths
     assert "/api/generate" in paths
-    assert "/api/steer" in paths
+    assert "/api/confirm-steer/{session_id}" in paths
+    assert "/api/reject-steer/{session_id}" in paths
 
 
-def test_openapi_does_not_expose_judge(client: TestClient):
-    """After the merge, /judge is NOT a public endpoint — judge runs in-process."""
+def test_openapi_does_not_expose_legacy_judge_endpoints(client: TestClient):
     r = client.get("/openapi.json")
     paths = r.json()["paths"]
+    # Per-monologue judge layer was removed — no /judge, no /api/steer.
     assert "/judge" not in paths
     assert "/rubrics" not in paths
+    assert "/api/steer" not in paths
 
 
-# ─── CORS (migrated from test_judge_service.py) ────────────────────────────
+# ─── CORS ──────────────────────────────────────────────────────────────────
 
 
 def test_cors_allowed_origin(client: TestClient):
@@ -272,5 +219,4 @@ def test_cors_blocks_disallowed_origin(client: TestClient):
             "Access-Control-Request-Method": "POST",
         },
     )
-    # Disallowed origin → CORS middleware doesn't echo the origin header back
     assert r.headers.get("access-control-allow-origin") != "http://evil.example"

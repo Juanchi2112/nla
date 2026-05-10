@@ -255,9 +255,7 @@ async def generate(req: GenerateRequest) -> StreamingResponse:
     async def event_source():
         async with state.lock:
             try:
-                async for ev in stream_events(
-                    state.extractor, state.actor, req.prompt, config
-                ):
+                async for ev in stream_events(state.extractor, state.actor, req.prompt, config):
                     if ev.kind == "token":
                         yield _sse("token", {"step": ev.step, "text": ev.text})
                     elif ev.kind == "nla_trace":
