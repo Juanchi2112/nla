@@ -140,24 +140,24 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  margin-top: 20px;
-  padding: 24px 20px;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 12px 16px;
   background: rgba(230, 107, 107, 0.18);
-  border: 2.5px solid var(--diagram-red);
-  border-radius: 8px;
+  border: 2px solid var(--diagram-red);
+  border-radius: 6px;
   text-align: center;
   animation: bannerPulse 2s ease-in-out infinite;
 }
 
 @keyframes bannerPulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(230, 107, 107, 0); }
-  50% { box-shadow: 0 0 0 6px rgba(230, 107, 107, 0.15); }
+  50% { box-shadow: 0 0 0 4px rgba(230, 107, 107, 0.12); }
 }
 
 .incumplimientoTitle {
   font-family: var(--font-mono);
-  font-size: 26px;
+  font-size: 17px;
   font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -167,7 +167,7 @@
 
 .incumplimientoSub {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: rgba(230, 107, 107, 0.75);
@@ -229,21 +229,21 @@
 }
 
 .promptBox {
-  padding: 22px;
+  padding: 14px 16px;
   background: rgba(0, 0, 0, 0.55);
   border: 1.5px solid rgba(224, 166, 86, 0.25);
   border-radius: 4px;
-  font-family: var(--font-serif);
-  font-size: 20px;
-  font-style: italic;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-style: normal;
   font-weight: 400;
-  line-height: 1.85;
-  color: var(--fg);
+  line-height: 1.65;
+  color: var(--fg-secondary);
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 300px;
+  max-height: 200px;
   overflow-y: auto;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.02em;
 }
 
 /* ─ Steer action buttons ─ */

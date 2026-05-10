@@ -78,6 +78,7 @@ export default function Home() {
     correction_prompt: string;
     reason: string;
   } | null>(null);
+  const [correctionPrompt, setCorrectionPrompt] = useState<string | null>(null);
   const [steerCountdown, setSteerCountdown] = useState<number>(60);
   const [steerStatus, setSteerStatus] = useState<"idle" | "started" | "rejected">("idle");
 
@@ -191,6 +192,7 @@ export default function Home() {
     setVerdicts({});
     setSteerDelta(null);
     setPendingSteer(null);
+    setCorrectionPrompt(null);
     setSteerStatus("idle");
     setCurrentPhaseLabel("original");
     setSelectedTokenId(null);
@@ -274,10 +276,12 @@ export default function Home() {
       },
       onSteeringProposed: (e) => {
         setPendingSteer({ correction_prompt: e.correction_prompt, reason: e.reason });
+        setCorrectionPrompt(e.correction_prompt);
         setSteerCountdown(e.timeout_seconds ?? 60);
       },
       onSteeringStarted: (e) => {
         setSteerStatus("started");
+        setCorrectionPrompt(e.correction_prompt);
         setPendingSteer(null);
         phaseLabelRef.current = "steered";
         setCurrentPhaseLabel("steered");
@@ -347,6 +351,7 @@ export default function Home() {
     setVerdicts({});
     setSteerDelta(null);
     setPendingSteer(null);
+    setCorrectionPrompt(null);
     setSteerStatus("idle");
     setCurrentPhaseLabel("original");
     setSelectedTokenId(null);
@@ -647,6 +652,7 @@ export default function Home() {
                 steerStatus={steerStatus}
                 phase={phase}
                 pendingSteer={pendingSteer}
+                correctionPrompt={correctionPrompt}
                 onConfirm={handleConfirmSteer}
                 onReject={handleRejectSteer}
                 steerCountdown={steerCountdown}

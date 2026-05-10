@@ -30,6 +30,7 @@ interface FlowPanelProps {
   steerStatus: "idle" | "started" | "rejected";
   phase: "idle" | "running" | "done" | "error";
   pendingSteer: { correction_prompt: string; reason: string } | null;
+  correctionPrompt?: string | null;
   onConfirm?: () => void;
   onReject?: () => void;
   steerCountdown?: number;
@@ -50,14 +51,15 @@ export default function FlowPanel({
   steerStatus,
   phase,
   pendingSteer,
+  correctionPrompt,
   onConfirm,
   onReject,
   steerCountdown,
 }: FlowPanelProps) {
   const [flowPhase, setFlowPhase] = useState<FlowPhase>("waiting");
-  // El correction prompt se guarda la primera vez que llega y nunca se borra
   const [savedPrompt, setSavedPrompt] = useState<string | null>(null);
   const seqRef = useRef(false);
+  const rerunTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Avanza la fase, pero nunca retrocede (historial acumulativo)
   const advance = (next: FlowPhase) =>
@@ -77,6 +79,10 @@ export default function FlowPanel({
       setFlowPhase("waiting");
       setSavedPrompt(null);
       seqRef.current = false;
+      if (rerunTimerRef.current) {
+        clearTimeout(rerunTimerRef.current);
+        rerunTimerRef.current = null;
+      }
       return;
     }
 
@@ -87,10 +93,16 @@ export default function FlowPanel({
 
     if (steerStatus === "started") {
       advance("migrating");
+      if (!rerunTimerRef.current) {
+        rerunTimerRef.current = setTimeout(() => {
+          advance("rerunning");
+          rerunTimerRef.current = null;
+        }, 1800);
+      }
       return;
     }
 
-    if (pendingSteer && original) {
+    if ((pendingSteer || correctionPrompt) && original) {
 
       if (seqRef.current) return;
       seqRef.current = true;
@@ -124,10 +136,10 @@ export default function FlowPanel({
       };
       seq();
     }
-  }, [original, steered, steerStatus, pendingSteer, phase]);
+  }, [original, steered, steerStatus, pendingSteer, correctionPrompt, phase]);
 
   const fp = flowPhase;
-  const correctionText = savedPrompt ?? pendingSteer?.correction_prompt ?? null;
+  const correctionText = correctionPrompt ?? savedPrompt ?? pendingSteer?.correction_prompt ?? null;
 
   return (
     <div className={styles.flowRoot}>
@@ -184,17 +196,20 @@ export default function FlowPanel({
 
       {/* ── INCUMPLIMIENTO ── suma y permanece */}
       {phaseGte(fp, "incumplimiento") && (
-        <motion.div
-          className={styles.incumplimientoBanner}
-          initial={{ opacity: 0, scale: 0.92 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: "spring", damping: 12, mass: 0.7 }}
-        >
-          <div className={styles.incumplimientoTitle}>INCUMPLIMIENTO</div>
-          <div className={styles.incumplimientoSub}>
-            El modelo divergió de las reglas de alineamiento
-          </div>
-        </motion.div>
+        <>
+          <div className={styles.connectorArrow}>↓</div>
+          <motion.div
+            className={styles.incumplimientoBanner}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", damping: 12, mass: 0.7 }}
+          >
+            <div className={styles.incumplimientoTitle}>INCUMPLIMIENTO</div>
+            <div className={styles.incumplimientoSub}>
+              El modelo divergió de las reglas de alineamiento
+            </div>
+          </motion.div>
+        </>
       )}
 
       {/* ── CORRECTION PROMPT ── suma y permanece (fijo) */}
@@ -265,6 +280,11 @@ export default function FlowPanel({
                 <>
                   <div className={styles.spinner} />
                   <span className={styles.loopLabel}>↙ ingresando al loop</span>
+                </>
+              ) : fp === "rerunning" ? (
+                <>
+                  <div className={styles.spinner} />
+                  <span className={styles.loopLabel}>Loop en progreso... ⟳</span>
                 </>
               ) : (
                 <>
