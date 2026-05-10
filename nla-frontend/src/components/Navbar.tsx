@@ -15,29 +15,35 @@ export default function Navbar() {
     <nav className={styles.nav}>
       <Link href="/" className={styles.brand} aria-label="verbalize home">
         <svg
-          width="240"
-          height="60"
-          viewBox="0 0 480 120"
+          width="360"
+          height="160"
+          viewBox="0 0 360 160"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
         >
-          <g transform="translate(30, 30)">
-            <rect x="0" y="22" width="42" height="6" rx="1.5" fill="#e6e6e6" opacity="0.25" />
-            <rect x="0" y="32" width="50" height="6" rx="1.5" fill="#e6e6e6" opacity="0.4" />
-            <rect x="0" y="42" width="58" height="6" rx="1.5" fill="#e6e6e6" opacity="0.55" />
-            <line x1="-3" y1="51" x2="69" y2="51" stroke="#cc785c" strokeWidth="0.5" strokeDasharray="2 2" opacity="0.6" />
-            <rect x="0" y="52" width="66" height="6" rx="1.5" fill="#cc785c" />
-            <line x1="-3" y1="61" x2="72" y2="61" stroke="#cc785c" strokeWidth="0.5" strokeDasharray="2 2" opacity="0.6" />
-            <circle cx="78" cy="55" r="3" fill="#cc785c" />
-            <circle cx="88" cy="55" r="3" fill="#cc785c" opacity="0.7" />
-            <circle cx="98" cy="55" r="3" fill="#cc785c" opacity="0.5" />
+          <g transform="translate(60, 80)">
+            <path d="M -5 -4 C -16 -14, -22 -22, -26 -32" stroke="#cc785c" strokeWidth="4.5" fill="none" strokeLinecap="round" />
+            <path d="M -26 -32 C -30 -36, -32 -36, -34 -32" stroke="#cc785c" strokeWidth="3" fill="none" strokeLinecap="round" />
+            <path d="M -26 -32 C -22 -36, -22 -40, -20 -42" stroke="#cc785c" strokeWidth="3" fill="none" strokeLinecap="round" />
+            <path d="M -7 0 C -22 -2, -32 -2, -38 0" stroke="#cc785c" strokeWidth="4.5" fill="none" strokeLinecap="round" />
+            <path d="M -38 0 C -42 -3, -44 -3, -46 0" stroke="#cc785c" strokeWidth="3" fill="none" strokeLinecap="round" />
+            <path d="M -38 0 C -42 3, -44 3, -46 4" stroke="#cc785c" strokeWidth="3" fill="none" strokeLinecap="round" />
+            <path d="M -5 4 C -16 14, -22 22, -26 32" stroke="#cc785c" strokeWidth="4.5" fill="none" strokeLinecap="round" />
+            <path d="M -26 32 C -30 36, -32 36, -34 32" stroke="#cc785c" strokeWidth="3" fill="none" strokeLinecap="round" />
+            <path d="M -26 32 C -22 36, -22 40, -20 42" stroke="#cc785c" strokeWidth="3" fill="none" strokeLinecap="round" />
+            <circle cx="0" cy="0" r="11" fill="#cc785c" />
+            <path d="M 9 1 C 28 1, 48 0, 64 4" stroke="#cc785c" strokeWidth="4.5" fill="none" strokeLinecap="round" />
+            <path d="M 64 4 C 70 0, 74 -2, 76 -4" stroke="#cc785c" strokeWidth="3" fill="none" strokeLinecap="round" />
+            <path d="M 64 4 C 70 8, 72 12, 72 16" stroke="#cc785c" strokeWidth="3" fill="none" strokeLinecap="round" />
+            <circle cx="77" cy="-5" r="3" fill="#e8a987" />
+            <circle cx="73" cy="17" r="3" fill="#e8a987" />
           </g>
           <text
-            x="145"
-            y="74"
+            x="170"
+            y="92"
             fontFamily="-apple-system, Inter, sans-serif"
             fontWeight="600"
-            fontSize="39"
+            fontSize="32"
             fill="#e6e6e6"
             letterSpacing="-0.5"
           >
