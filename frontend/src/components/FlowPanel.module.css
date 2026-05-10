@@ -59,9 +59,9 @@
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-family: var(--font-serif);
-  font-size: 13px;
-  line-height: 1.5;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
   color: var(--fg);
   max-height: 120px;
   overflow-y: auto;
@@ -132,7 +132,10 @@
 .divClaim {
   color: var(--fg);
   margin: 0;
-  font-weight: 500;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.6;
 }
 
 .divergenceExplanation {
@@ -141,9 +144,9 @@
   background: rgba(136, 135, 132, 0.06);
   border-left: 2px solid var(--fg-secondary);
   border-radius: 2px;
-  font-family: var(--font-serif);
-  font-size: 12px;
-  line-height: 1.5;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
   color: var(--fg-secondary);
 }
 
