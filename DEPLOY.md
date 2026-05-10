@@ -77,11 +77,26 @@ El smoke test usa un vector random. Para probar con activations **reales** del r
 
 ## Levantar el GPU FastAPI server (`gpu/server.py`)
 
-Para que el backend (Railway) se conecte vía `/decode`, hay que levantar el FastAPI del lado GPU:
+El backend (Railway) habla con la GPU vía SSE en `POST /generate`. El endpoint
+`/decode` (no-streaming) sigue disponible para análisis offline (`gpu/scripts/decode_parquet.py`)
+pero el flujo de prod no lo usa.
 
 ```bash
-# Después de setup + SGLang corriendo
+# Después de setup + SGLang corriendo CON MEM_FRAC=0.5
 uv run uvicorn gpu.server:app --host 0.0.0.0 --port 44016
+```
+
+> **Importante**: SGLang TIENE que arrancarse con `MEM_FRAC=0.5`, no con el default 0.85.
+> El proceso de `gpu.server` carga Qwen base in-process (~14 GiB bf16) además del
+> actor que SGLang sirve. Con 0.85 SGLang come la tarjeta entera y `from_pretrained`
+> de Qwen tira `CUDA out of memory` antes del primer request.
+
+Smoke contra `/generate` desde el mismo box (curl `--no-buffer` para ver los frames SSE en vivo):
+
+```bash
+curl --no-buffer -X POST http://localhost:44016/generate \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"What is the capital of France?","max_new_tokens":32,"sniff_every_k":5}'
 ```
 
 El backend usa `ORCHESTRATOR_GPU=decoder` y `GPU_URL=http://<gpu-ip>:44016` para hablarle.
@@ -93,7 +108,7 @@ El backend usa `ORCHESTRATOR_GPU=decoder` y `GPU_URL=http://<gpu-ip>:44016` para
 | `MODEL_REPO` | `kitft/nla-qwen2.5-7b-L20-av` | repo HF con los pesos |
 | `MODEL_DIR` | `./actor_hf` | dónde se descargan los pesos |
 | `PORT` | `30000` (SGLang) / `44016` (server.py) | — |
-| `MEM_FRAC` | `0.85` | `--mem-fraction-static` de SGLang |
+| `MEM_FRAC` | `0.85` (standalone) / `0.5` (cohabitando con `/generate`) | `--mem-fraction-static` de SGLang |
 
 Ej: `MODEL_DIR=/data/qwen bash gpu/scripts/setup.sh`
 
@@ -182,9 +197,10 @@ nla/
 │   ├── Dockerfile              # uv-based, no requirements.txt
 │   └── railway.toml
 ├── gpu/                        # GPU-only code                    → vast.ai
-│   ├── server.py               # FastAPI /decode endpoint
+│   ├── server.py               # FastAPI: /generate (SSE) + /decode (legacy)
+│   ├── streaming.py            # shared loop (Extractor + stream_events)
 │   ├── nla_inference.py        # vendored from kitft — NO MODIFICAR
-│   ├── scripts/                # setup, launch_sglang, smoke_test, extract, decode
+│   ├── scripts/                # setup, launch_sglang, smoke_test, extract, decode, generate_stream
 │   └── examples/               # transcripts vendored
 ├── tests/                      # pytest del backend + judge
 ├── .github/workflows/ci.yml
@@ -202,10 +218,10 @@ Cuando la GPU esté arriba (port 44016 por convención):
 PYTHONPATH=. \
   ORCHESTRATOR_GPU=decoder \
   GPU_URL=http://<gpu-ip>:44016 \
-  GPU_SKIP_FIRST=5 \
   JUDGE_BACKEND=regex \
   uv run uvicorn backend.app:app --port 8001
 ```
 
-El frontend no necesita cambios — los `nla_trace` events ahora vienen de decodes
-reales del NLA en lugar de monólogos canned.
+El frontend no necesita cambios — los `token` y `nla_trace` events ahora vienen
+de generación autoregresiva real (Qwen + actor con overlap por SGLang) en lugar
+de mocks o replays.
