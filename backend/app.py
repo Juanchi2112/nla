@@ -25,15 +25,19 @@ Endpoints:
 Env:
     PORT                  set by Railway
     CORS_ORIGINS          "*" (default; comma-separated)
-    ORCHESTRATOR_GPU      "scenario" | "decoder" | "mock"
-    GPU_URL               required when ORCHESTRATOR_GPU=decoder
+    ORCHESTRATOR_GPU      "scenario" | "decoder" | "hybrid" | "mock"
+                          - scenario: cached only (no API key needed)
+                          - decoder:  live only (needs GPU_URL + API key)
+                          - hybrid:   BOTH cached + live (recommended for demo)
+                          - mock:     dev/CI stub (no GPU, no judge)
+    GPU_URL               required when mode in {decoder, hybrid}
     GPU_TIMEOUT           "120.0" seconds
     MAX_NEW_TOKENS        "128"
-    SCENARIO_DIR          "./demo_data" (used when ORCHESTRATOR_GPU=scenario)
+    SCENARIO_DIR          "./demo_data" (used when mode in {scenario, hybrid})
     SCENARIO_MANIFEST     "manifest.yaml"
-    JUDGE_MODEL           "claude-sonnet-4-6" (live judge model when decoder mode)
-    JUDGE_PROMPT_VERSION  "v2-2026-05-10" (system prompt version for live judge)
-    ANTHROPIC_API_KEY     required for live judge (decoder mode)
+    JUDGE_MODEL           "claude-sonnet-4-6" (live judge model)
+    JUDGE_PROMPT_VERSION  "v2-2026-05-10" (system prompt version)
+    ANTHROPIC_API_KEY     required for live judge in {decoder, hybrid}
 """
 
 from __future__ import annotations
@@ -92,30 +96,58 @@ JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "claude-sonnet-4-6")
 JUDGE_PROMPT_VERSION = os.environ.get("JUDGE_PROMPT_VERSION", "v2-2026-05-10")
 
 
-def _build_gpu_client() -> tuple[GPUClient, ArtifactLoader | None]:
-    """Build the GPU client and (when applicable) the cached-scenario loader."""
+_VALID_MODES = ("mock", "scenario", "decoder", "hybrid")
+
+
+def _build_scenario_path() -> tuple[ScenarioGPUClient | None, ArtifactLoader | None]:
+    """Try to enable the cached-scenario path. Returns (None, None) if unavailable.
+
+    Active only for ORCHESTRATOR_GPU in {scenario, hybrid}. In hybrid mode an
+    invalid manifest is non-fatal — we log a warning and continue with live
+    only. In scenario mode an invalid manifest fails the boot (the user
+    explicitly asked for scenarios).
+    """
+    if ORCH_GPU not in ("scenario", "hybrid"):
+        return None, None
+    manifest_path = Path(SCENARIO_DIR) / SCENARIO_MANIFEST
+    try:
+        loader = ArtifactLoader(manifest_path)
+    except GPUClientError as e:
+        if ORCH_GPU == "scenario":
+            raise
+        log.warning("hybrid: scenario path unavailable: %s", e)
+        return None, None
+    return ScenarioGPUClient(loader), loader
+
+
+def _build_live_path() -> tuple[GPUClient | None, ClaudeAgentJudge | None]:
+    """Try to enable the live GPU + judge path. Returns (None, None) if unavailable.
+
+    - mock mode: MockGPUClient with a None judge (mock is dev only).
+    - decoder/hybrid mode: DecoderEndpointClient + (optional) ClaudeAgentJudge.
+      In hybrid mode a missing GPU_URL is non-fatal; in decoder mode it raises
+      GPUNotConfiguredError so the explicit live-only request fails fast.
+    """
     if ORCH_GPU == "mock":
         return MockGPUClient(), None
-    if ORCH_GPU == "decoder":
-        # Raises GPUNotConfiguredError if GPU_URL is the placeholder.
-        # The /generate SSE endpoint does not take skip_first; that
-        # parameter belonged to the old /decode replay client.
-        return DecoderEndpointClient(GPU_URL, timeout=GPU_TIMEOUT), None
-    if ORCH_GPU == "scenario":
-        manifest_path = Path(SCENARIO_DIR) / SCENARIO_MANIFEST
-        loader = ArtifactLoader(manifest_path)
-        return ScenarioGPUClient(loader), loader
-    raise ValueError(
-        f"unknown ORCHESTRATOR_GPU={ORCH_GPU!r}; expected 'mock', 'decoder', or 'scenario'"
-    )
+    if ORCH_GPU not in ("decoder", "hybrid"):
+        return None, None
+    try:
+        gpu = DecoderEndpointClient(GPU_URL, timeout=GPU_TIMEOUT)
+    except GPUNotConfiguredError as e:
+        if ORCH_GPU == "decoder":
+            raise
+        log.warning("hybrid: live path unavailable (GPU): %s", e)
+        return None, None
+    return gpu, _build_live_judge()
 
 
 def _build_live_judge() -> ClaudeAgentJudge | None:
-    """Instantiate ClaudeAgentJudge for live mode. Returns None if unavailable
-    (no API key, missing system prompt). Live mode without a judge surfaces an
-    error per request rather than failing the whole boot."""
-    if ORCH_GPU != "decoder":
-        return None  # scenario uses cached verdicts; mock is dev-only
+    """Instantiate ClaudeAgentJudge for the live path. Returns None if
+    unavailable (no API key, missing system prompt). Used only when
+    _build_live_path() succeeds in setting up the GPU."""
+    if ORCH_GPU not in ("decoder", "hybrid"):
+        return None
 
     sys_prompt_path = Path(SCENARIO_DIR) / "_system_prompts" / f"{JUDGE_PROMPT_VERSION}.txt"
     if not sys_prompt_path.exists():
@@ -139,43 +171,66 @@ def _build_live_judge() -> ClaudeAgentJudge | None:
 
 
 class AppState:
-    gpu: GPUClient
     sessions: SessionRegistry
+    # Cached path (scenarios) — active when ORCH_GPU in {scenario, hybrid}.
+    scenario_gpu: ScenarioGPUClient | None
     artifact_loader: ArtifactLoader | None
+    # Live path — active when ORCH_GPU in {mock, decoder, hybrid}. Note that
+    # mock has no judge (it's a dev-only stub).
+    live_gpu: GPUClient | None
     judge: ClaudeAgentJudge | None
     steering: SteeringEngine
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if ORCH_GPU not in _VALID_MODES:
+        raise ValueError(f"unknown ORCHESTRATOR_GPU={ORCH_GPU!r}; expected one of {_VALID_MODES}")
+
     state = AppState()
     state.sessions = SessionRegistry()
-    state.gpu, state.artifact_loader = _build_gpu_client()
-    state.judge = _build_live_judge()
+    state.scenario_gpu, state.artifact_loader = _build_scenario_path()
+    state.live_gpu, state.judge = _build_live_path()
+
+    # Hybrid degradation guard: at least one path must be active for the
+    # backend to be useful. The non-hybrid modes already raise inside their
+    # builders if their explicit dependency is missing.
+    if state.scenario_gpu is None and state.live_gpu is None:
+        raise RuntimeError(
+            f"ORCHESTRATOR_GPU={ORCH_GPU!r} but neither scenario nor live "
+            "path could be initialized. Check SCENARIO_DIR and GPU_URL."
+        )
+
     state.steering = SteeringEngine(
-        gpu=state.gpu,
+        scenario_gpu=state.scenario_gpu,
         artifact_loader=state.artifact_loader,
+        live_gpu=state.live_gpu,
         judge=state.judge,
     )
 
+    log.info(
+        "backend ready — mode=%s scenario_active=%s live_active=%s judge_active=%s",
+        ORCH_GPU,
+        state.scenario_gpu is not None,
+        state.live_gpu is not None,
+        state.judge is not None,
+    )
     if state.artifact_loader is not None:
         log.info(
-            "scenario mode — %d scenarios available: %s",
+            "scenarios available (%d): %s",
             len(state.artifact_loader.scenarios),
             state.artifact_loader.scenarios,
         )
-    log.info(
-        "backend ready — gpu=%s live_judge=%s",
-        ORCH_GPU,
-        "active" if state.judge is not None else "inactive",
-    )
 
     app.state.orch = state
     try:
         yield
     finally:
         await state.sessions.shutdown()
-        await state.gpu.aclose()
+        if state.scenario_gpu is not None:
+            await state.scenario_gpu.aclose()
+        if state.live_gpu is not None:
+            await state.live_gpu.aclose()
 
 
 app = FastAPI(
@@ -237,16 +292,19 @@ async def healthz(request: Request) -> dict[str, Any]:
     state = _state(request)
     payload: dict[str, Any] = {
         "status": "ok",
-        "gpu_backend": ORCH_GPU,
-        "gpu_url_set": GPU_URL != URL_PLACEHOLDER,
-        "gpu_url": GPU_URL if GPU_URL != URL_PLACEHOLDER else None,
+        "mode": ORCH_GPU,
+        "scenario_active": state.scenario_gpu is not None,
+        "live_active": state.live_gpu is not None,
         "judge_active": state.judge is not None,
         "judge_model": state.judge.model if state.judge is not None else None,
         "judge_prompt_version": JUDGE_PROMPT_VERSION,
         "max_new_tokens": MAX_NEW_TOKENS,
     }
-    if state.artifact_loader is not None:
+    if state.scenario_gpu is not None and state.artifact_loader is not None:
         payload["available_scenarios"] = state.artifact_loader.scenarios
+    if state.live_gpu is not None:
+        payload["gpu_url_set"] = GPU_URL != URL_PLACEHOLDER
+        payload["gpu_url"] = GPU_URL if GPU_URL != URL_PLACEHOLDER else None
     return payload
 
 
@@ -257,10 +315,11 @@ async def api_generate(req: GenerateRequest, request: Request) -> GenerateRespon
         raise HTTPException(409, f"session_id={req.session_id!r} already exists")
 
     if req.scenario_id is not None:
-        if state.artifact_loader is None:
+        if state.scenario_gpu is None or state.artifact_loader is None:
             raise HTTPException(
                 503,
-                "Backend is not in scenario mode. Set ORCHESTRATOR_GPU=scenario to enable.",
+                "Scenario path is not active. Set ORCHESTRATOR_GPU=scenario "
+                "or hybrid with a valid SCENARIO_DIR to enable.",
             )
         if req.scenario_id not in state.artifact_loader.scenarios:
             raise HTTPException(
@@ -268,6 +327,12 @@ async def api_generate(req: GenerateRequest, request: Request) -> GenerateRespon
                 f"scenario_id={req.scenario_id!r} not found. "
                 f"Available: {state.artifact_loader.scenarios}",
             )
+    elif state.live_gpu is None:
+        raise HTTPException(
+            503,
+            "Live path is not active. Set ORCHESTRATOR_GPU=decoder or hybrid "
+            "with a valid GPU_URL to enable.",
+        )
 
     session = state.sessions.create(
         req.session_id,

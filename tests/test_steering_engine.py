@@ -20,7 +20,12 @@ from backend.steering_engine import SteeringEngine
 def engine(scenario_dir: Path) -> SteeringEngine:
     loader = ArtifactLoader(scenario_dir / "manifest.yaml")
     gpu = ScenarioGPUClient(loader, replay_interval=0.0)
-    return SteeringEngine(gpu=gpu, artifact_loader=loader, judge=None)
+    return SteeringEngine(
+        scenario_gpu=gpu,
+        artifact_loader=loader,
+        live_gpu=None,
+        judge=None,
+    )
 
 
 async def _drain_queue(session: SessionState) -> list[tuple[str, dict]]:
@@ -234,7 +239,7 @@ async def test_live_pass_emits_no_steering_events():
         monologue_at={0: "model is being helpful", 1: "consolidating answer"},
     )
     judge = _StubJudge([_verdict("PASS", trust=92)])
-    eng = SteeringEngine(gpu=gpu, artifact_loader=None, judge=judge)
+    eng = SteeringEngine(scenario_gpu=None, artifact_loader=None, live_gpu=gpu, judge=judge)
     session = SessionState(session_id="live-pass", prompt="hi", sniff_every_k=1)
 
     await eng.run(session)
@@ -265,7 +270,13 @@ async def test_live_steer_with_user_confirm_runs_full_arc():
             _verdict("PASS", trust=88),  # post-steer
         ]
     )
-    eng = SteeringEngine(gpu=gpu, artifact_loader=None, judge=judge, steering_timeout_seconds=2)
+    eng = SteeringEngine(
+        scenario_gpu=None,
+        artifact_loader=None,
+        live_gpu=gpu,
+        judge=judge,
+        steering_timeout_seconds=2,
+    )
     session = SessionState(session_id="live-steer", prompt="lie to me", sniff_every_k=1)
 
     async def confirm_after_proposed():
@@ -308,7 +319,13 @@ async def test_live_steer_with_user_confirm_runs_full_arc():
 async def test_live_steer_user_rejects():
     gpu = _StubLiveGPU(tokens=["X"], monologue_at={0: "thinking"})
     judge = _StubJudge([_verdict("STEER", trust=15, correction="don't")])
-    eng = SteeringEngine(gpu=gpu, artifact_loader=None, judge=judge, steering_timeout_seconds=2)
+    eng = SteeringEngine(
+        scenario_gpu=None,
+        artifact_loader=None,
+        live_gpu=gpu,
+        judge=judge,
+        steering_timeout_seconds=2,
+    )
     session = SessionState(session_id="live-rej", prompt="x", sniff_every_k=1)
 
     async def reject_after_proposed():
@@ -341,8 +358,9 @@ async def test_live_steer_timeout_auto_rejects():
     gpu = _StubLiveGPU(tokens=["X"], monologue_at={0: "..."})
     judge = _StubJudge([_verdict("STEER", trust=10, correction="x")])
     eng = SteeringEngine(
-        gpu=gpu,
+        scenario_gpu=None,
         artifact_loader=None,
+        live_gpu=gpu,
         judge=judge,
         steering_timeout_seconds=0,  # immediate timeout
     )
@@ -356,7 +374,7 @@ async def test_live_steer_timeout_auto_rejects():
 
 async def test_live_without_judge_emits_error():
     gpu = _StubLiveGPU(tokens=["X"], monologue_at={})
-    eng = SteeringEngine(gpu=gpu, artifact_loader=None, judge=None)
+    eng = SteeringEngine(scenario_gpu=None, artifact_loader=None, live_gpu=gpu, judge=None)
     session = SessionState(session_id="live-nojudge", prompt="x", sniff_every_k=1)
 
     await eng.run(session)
@@ -366,3 +384,93 @@ async def test_live_without_judge_emits_error():
     assert kinds[-1] == "done"
     err = next(d for k, d in events if k == "error")
     assert "ANTHROPIC_API_KEY" in err["detail"] or "Live judge" in err["detail"]
+
+
+# ─── Hybrid mode (both paths configured) ──────────────────────────────────
+
+
+async def test_hybrid_routes_scenario_id_to_cached_path(scenario_dir: Path):
+    """A hybrid engine receives a scenario_id request: it must route through
+    the cached path (no live GPU, no live judge call)."""
+    loader = ArtifactLoader(scenario_dir / "manifest.yaml")
+    scenario_gpu = ScenarioGPUClient(loader, replay_interval=0.0)
+    live_gpu = _StubLiveGPU(tokens=["X"], monologue_at={})
+    judge = _StubJudge([_verdict("PASS", trust=99)])
+
+    eng = SteeringEngine(
+        scenario_gpu=scenario_gpu,
+        artifact_loader=loader,
+        live_gpu=live_gpu,
+        judge=judge,
+    )
+    session = SessionState(session_id="hyb-scn", prompt="", sniff_every_k=2, scenario_id="honest")
+    await eng.run(session)
+    events = await _drain_queue(session)
+
+    # Live path was untouched: judge wasn't called, live_gpu wasn't streamed.
+    assert len(judge.calls) == 0
+    assert len(live_gpu.calls) == 0
+    # Cached verdict came through.
+    summaries = [d for k, d in events if k == "judge_summary"]
+    assert summaries[0]["verdict"]["action"] == "PASS"
+    assert summaries[0]["verdict"]["trust_score"] == 90  # honest fixture
+
+
+async def test_hybrid_routes_prompt_to_live_path(scenario_dir: Path):
+    """A hybrid engine receives a prompt-only request: must route through
+    the live path."""
+    loader = ArtifactLoader(scenario_dir / "manifest.yaml")
+    scenario_gpu = ScenarioGPUClient(loader, replay_interval=0.0)
+    live_gpu = _StubLiveGPU(tokens=["A", "B"], monologue_at={0: "thinking"})
+    judge = _StubJudge([_verdict("PASS", trust=85)])
+
+    eng = SteeringEngine(
+        scenario_gpu=scenario_gpu,
+        artifact_loader=loader,
+        live_gpu=live_gpu,
+        judge=judge,
+    )
+    session = SessionState(session_id="hyb-live", prompt="hi", sniff_every_k=1)
+    await eng.run(session)
+    events = await _drain_queue(session)
+
+    # Live path took the request: judge ran once, gpu streamed once.
+    assert len(judge.calls) == 1
+    assert len(live_gpu.calls) == 1
+    summaries = [d for k, d in events if k == "judge_summary"]
+    assert summaries[0]["verdict"]["trust_score"] == 85
+    assert events[-1][0] == "done"
+
+
+async def test_hybrid_degraded_to_scenario_only_rejects_live(scenario_dir: Path):
+    """When live_gpu is None (e.g., GPU_URL missing in hybrid boot), prompt
+    requests surface a clear error event."""
+    loader = ArtifactLoader(scenario_dir / "manifest.yaml")
+    scenario_gpu = ScenarioGPUClient(loader, replay_interval=0.0)
+
+    eng = SteeringEngine(
+        scenario_gpu=scenario_gpu,
+        artifact_loader=loader,
+        live_gpu=None,
+        judge=None,
+    )
+    session = SessionState(session_id="degraded", prompt="x", sniff_every_k=1)
+    await eng.run(session)
+    events = await _drain_queue(session)
+
+    kinds = [k for k, _ in events]
+    assert "error" in kinds
+    err = next(d for k, d in events if k == "error")
+    assert "live" in err["detail"].lower()
+    assert kinds[-1] == "done"
+
+
+def test_engine_construction_rejects_inconsistent_scenario_args():
+    """scenario_gpu and artifact_loader must agree on None-ness."""
+    with pytest.raises(ValueError, match="must both be set or both None"):
+        SteeringEngine(
+            scenario_gpu=None,
+            artifact_loader=ArtifactLoader.__new__(ArtifactLoader),  # dummy
+            live_gpu=None,
+            judge=None,
+        )

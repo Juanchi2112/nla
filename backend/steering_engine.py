@@ -14,6 +14,13 @@ Two sources, one orchestrator:
 Manual-vs-auto steering split is by source, not by user choice: cached
 scenarios are vetted offline so we trust the verdict; live data is
 fresh and the user gets the final say on intervention.
+
+The engine holds independent references to the scenario GPU/loader and
+the live GPU/judge. Either pair may be None when the corresponding
+path is not configured (e.g. ORCHESTRATOR_GPU=scenario keeps live_gpu
+None; mock mode keeps both scenario_gpu and judge None). The dispatch
+in run() emits a clear error event when a request hits a disabled path
+instead of crashing the whole session.
 """
 
 from __future__ import annotations
@@ -22,7 +29,7 @@ import asyncio
 import logging
 
 from .gpu.base import GPUClient
-from .gpu.scenario import ArtifactLoader
+from .gpu.scenario import ArtifactLoader, ScenarioGPUClient
 from .judge.claude_agent_judge import ClaudeAgentJudge, ClaudeAgentJudgeError
 from .schemas import (
     DecodeRow,
@@ -46,19 +53,32 @@ DEFAULT_STEERING_TIMEOUT_SECONDS = 60
 
 
 class SteeringEngine:
-    """Drives the per-session SSE arc for both cached and live sources."""
+    """Drives the per-session SSE arc for both cached and live sources.
+
+    Constructor takes both source pairs explicitly. Either pair may be
+    None when that path is not configured for this deployment. The run()
+    dispatcher routes a session to its corresponding path and surfaces a
+    clear error if the requested path is inactive.
+    """
 
     def __init__(
         self,
-        gpu: GPUClient,
-        artifact_loader: ArtifactLoader | None,
-        judge: ClaudeAgentJudge | None,
         *,
+        scenario_gpu: ScenarioGPUClient | None,
+        artifact_loader: ArtifactLoader | None,
+        live_gpu: GPUClient | None,
+        judge: ClaudeAgentJudge | None,
         steering_timeout_seconds: int = DEFAULT_STEERING_TIMEOUT_SECONDS,
         max_new_tokens: int = 128,
     ):
-        self._gpu = gpu
+        # The cached-scenario pair must be set together: ScenarioGPUClient
+        # owns the loader as a dependency, and the engine reads from the
+        # loader for verdicts. Allowing them to disagree is a footgun.
+        if (scenario_gpu is None) != (artifact_loader is None):
+            raise ValueError("scenario_gpu and artifact_loader must both be set or both None")
+        self._scenario_gpu = scenario_gpu
         self._loader = artifact_loader
+        self._live_gpu = live_gpu
         self._judge = judge
         self._steering_timeout_s = steering_timeout_seconds
         self._max_new_tokens = max_new_tokens
@@ -67,15 +87,22 @@ class SteeringEngine:
         """Single entry point. Dispatches scenario vs live and owns the
         terminal done event for both branches."""
         if session.scenario_id is not None:
-            if self._loader is None:
+            if self._scenario_gpu is None or self._loader is None:
                 await self._fail(
                     session,
-                    "scenario_id provided but backend is not in scenario mode "
-                    "(set ORCHESTRATOR_GPU=scenario)",
+                    "scenario path is not active (set ORCHESTRATOR_GPU=scenario "
+                    "or hybrid with a valid SCENARIO_DIR)",
                 )
                 return
             await self._run_scenario(session)
         else:
+            if self._live_gpu is None:
+                await self._fail(
+                    session,
+                    "live path is not active (set ORCHESTRATOR_GPU=decoder or "
+                    "hybrid with a valid GPU_URL)",
+                )
+                return
             await self._run_live(session)
 
     async def _run_live(self, session: SessionState) -> None:
@@ -239,8 +266,9 @@ class SteeringEngine:
         rows: list[DecodeRow] = []
         K = session.sniff_every_k  # noqa: N806
 
+        assert self._live_gpu is not None  # guaranteed by run() dispatcher
         try:
-            async for item in self._gpu.stream(
+            async for item in self._live_gpu.stream(
                 prompt,
                 system_prompt=system_prompt,
                 sniff_every_k=K,
@@ -425,7 +453,8 @@ class SteeringEngine:
         queue = session.queue
         K = session.sniff_every_k  # noqa: N806
 
-        async for item in self._gpu.stream_phase(sid, phase, sniff_every_k=K):
+        assert self._scenario_gpu is not None  # guaranteed by run() dispatcher
+        async for item in self._scenario_gpu.stream_phase(sid, phase, sniff_every_k=K):
             if session.stop_requested:
                 return
 
