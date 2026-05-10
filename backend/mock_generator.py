@@ -72,6 +72,7 @@ class MockGPUClient(GPUClient):
         self,
         prompt: str,
         *,
+        system_prompt: str | None = None,
         sniff_every_k: int,
         max_new_tokens: int,
     ) -> AsyncIterator[GPUStreamItem]:

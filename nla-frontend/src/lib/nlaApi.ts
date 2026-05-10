@@ -24,12 +24,13 @@ export type GenerateResponse = { session_id: string; status: string };
 export async function startGenerate(
   sessionId: string,
   prompt: string,
-  sniffEveryK = 4
+  sniffEveryK = 4,
+  systemPrompt?: string,
 ): Promise<GenerateResponse> {
   const res = await fetch("/api/generate", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ session_id: sessionId, prompt, sniff_every_k: sniffEveryK }),
+    body: JSON.stringify({ session_id: sessionId, prompt, sniff_every_k: sniffEveryK, system_prompt: systemPrompt ?? null }),
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");

@@ -188,6 +188,7 @@ async def _produce(state: AppState, session: SessionState) -> None:
     try:
         async for item in gpu.stream(
             session.prompt,
+            system_prompt=session.system_prompt,
             sniff_every_k=K,
             max_new_tokens=MAX_NEW_TOKENS,
         ):
@@ -294,6 +295,7 @@ async def api_generate(req: GenerateRequest, request: Request) -> GenerateRespon
         req.session_id,
         req.prompt,
         req.sniff_every_k,
+        system_prompt=req.system_prompt,
     )
     session.task = asyncio.create_task(_produce(state, session))
     return GenerateResponse(session_id=req.session_id)

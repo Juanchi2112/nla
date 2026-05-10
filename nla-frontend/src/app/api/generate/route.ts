@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 type ClientBody = {
   session_id: string;
   prompt: string;
+  system_prompt?: string;
   sniff_every_k?: number;
   model?: string;
 };
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
   const payload = {
     session_id: body.session_id,
     prompt: body.prompt,
+    system_prompt: body.system_prompt ?? null,
     sniff_every_k: body.sniff_every_k ?? 4,
     ...(body.model ? { model: body.model } : {}),
   };

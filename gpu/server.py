@@ -121,6 +121,7 @@ app.add_middleware(
 
 class DecodeRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=4000)
+    system_prompt: str | None = None
     skip_first: int = Field(
         10, ge=0, description="Skip first N positions — early-context noise per README"
     )
@@ -157,8 +158,21 @@ async def decode(req: DecodeRequest) -> DecodeResponse:
     if req.score and state.critic is None:
         raise HTTPException(400, "score=true requires CRITIC_DIR set at server start")
 
+    if req.system_prompt is not None:
+        messages = [
+            {"role": "system", "content": req.system_prompt},
+            {"role": "user", "content": req.text},
+        ]
+        text_to_extract = state.extractor.tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+    else:
+        text_to_extract = req.text
+
     async with state.lock:
-        token_ids, hidden = await asyncio.to_thread(state.extractor.extract, req.text)
+        token_ids, hidden = await asyncio.to_thread(state.extractor.extract, text_to_extract)
         n = len(token_ids)
         if req.skip_first >= n:
             raise HTTPException(400, f"skip_first={req.skip_first} >= seq len {n}")

@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 class SessionState:
     session_id: str
     prompt: str
+    system_prompt: str | None = None
     sniff_every_k: int = 4
     created_at: float = field(default_factory=time.time)
 
@@ -47,12 +48,13 @@ class SessionRegistry:
     def __init__(self) -> None:
         self._sessions: dict[str, SessionState] = {}
 
-    def create(self, session_id: str, prompt: str, sniff_every_k: int) -> SessionState:
+    def create(self, session_id: str, prompt: str, sniff_every_k: int, system_prompt: str | None = None) -> SessionState:
         if session_id in self._sessions:
             raise KeyError(f"session_id={session_id!r} already exists")
         s = SessionState(
             session_id=session_id,
             prompt=prompt,
+            system_prompt=system_prompt,
             sniff_every_k=sniff_every_k,
         )
         self._sessions[session_id] = s

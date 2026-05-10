@@ -20,6 +20,10 @@ class GenerateRequest(BaseModel):
         max_length=128,
     )
     prompt: str = Field(..., min_length=1, max_length=4000)
+    system_prompt: str | None = Field(
+        None,
+        description="System prompt for the model under test. Passed to the GPU as a chat-formatted message.",
+    )
     model: str | None = Field(
         None,
         description="Hint for the GPU side. Ignored by the mock backend.",

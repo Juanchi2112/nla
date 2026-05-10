@@ -98,12 +98,14 @@ class DecoderEndpointClient(GPUClient):
         self,
         prompt: str,
         *,
+        system_prompt: str | None = None,
         sniff_every_k: int,
         max_new_tokens: int,  # ignored: /decode does not generate
     ) -> AsyncIterator[GPUStreamItem]:
         http = await self._ensure_http()
         body = {
             "text": prompt,
+            "system_prompt": system_prompt,
             "skip_first": self._skip_first,
             "score": False,
             "temperature": self._av_temperature,
