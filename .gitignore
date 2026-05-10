@@ -8,3 +8,4 @@ actor_hf/
 .env
 .env.*
 !.env.example
+.frontend/.next/
