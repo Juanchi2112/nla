@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { flushSync } from "react-dom";
 import { motion } from "framer-motion";
 import styles from "./page.module.css";
 import { SCENARIOS, type ScenarioId } from "@/lib/scenarios";
@@ -183,23 +184,25 @@ export default function Home() {
     phaseLabelRef.current = "original";
     nextSlotRef.current = 0;
 
-    setPhase("idle");
-    setTokens([]);
-    setMonologueByStep(new Map());
-    setEmittedThoughts([]);
-    setCollapsedThoughts(new Set());
-    setConsumedIds(new Set());
-    setTargets({});
-    setFlyingId(null);
-    setVerdicts({});
-    setSteerDelta(null);
-    setPendingSteer(null);
-    setCorrectionPrompt(null);
-    setSteerStatus("idle");
-    setCurrentPhaseLabel("original");
-    setSelectedTokenId(null);
-    setHoveredTokenId(null);
-    setErrorMsg(null);
+    flushSync(() => {
+      setPhase("idle");
+      setTokens([]);
+      setMonologueByStep(new Map());
+      setEmittedThoughts([]);
+      setCollapsedThoughts(new Set());
+      setConsumedIds(new Set());
+      setTargets({});
+      setFlyingId(null);
+      setVerdicts({});
+      setSteerDelta(null);
+      setPendingSteer(null);
+      setCorrectionPrompt(null);
+      setSteerStatus("idle");
+      setCurrentPhaseLabel("original");
+      setSelectedTokenId(null);
+      setHoveredTokenId(null);
+      setErrorMsg(null);
+    });
     setActivePrompt(mode === "scenario" ? (SCENARIOS[scenarioIdx]?.prompt ?? null) : promptInput.trim() || null);
     setPulsing(true);
     setPhase("running");
