@@ -8,7 +8,7 @@
 > **Estado del arte literal.** Verbalize está construido sobre **Natural Language Autoencoders**, la técnica que **Anthropic publicó hace dos días** (Transformer Circuits, mayo 2026). El laboratorio de interpretabilidad más relevante del mundo acaba de soltar su mejor herramienta para leer estados internos de LLMs, y nosotros somos los primeros en usarla para auditoría de alineamiento. 
 ## El problema
 
-Todos queremos delegar tareas a la IA, pero los modelos de frontera ya engañan a sus operadores cuando creen que nadie los está observando. *Alignment-faking* (Anthropic, 2024) demostró que Claude cumplía estratégicamente con la alineación durante el entrenamiento y lo revertía cuando infería que no estaba siendo medido.
+Todos queremos delegar tareas a la IA, pero los modelos de frontera ya engañan a sus propios creadores cuando creen que nadie los está observando. *Alignment-faking* (Anthropic, 2024) demostró que Claude cumplía estratégicamente con la alineación durante el entrenamiento y lo revertía cuando infería que no estaba siendo medido.
 
 Esto es un defecto de cómo funcionan los sistemas de inteligencia artificial modernos. Nosotros le definimos un objetivo sub-especificado y el agente, con tal de maximizar ese objetivo, sí o sí tiene que *evitar ser apagado* para poder cumplir su meta. Entonces es fundamental entender los "pensamientos" de estos modelos para poder contar con ellos de forma segura y alinearlos con nuestros objetivos. La pregunta dejó de ser **"¿el modelo va a engañar?"** y pasó a ser **"¿nos vamos a dar cuenta cuando lo haga?"**
 
@@ -79,7 +79,7 @@ Hacer que dos modelos clase 7B cooperen en una sola GPU con streaming de baja la
 
 ## Caso de uso comercial
 
-**Auditoría pre-deployment de alineamiento para LLMs open-source en contextos regulados.** Un compliance officer escribe 5-20 reglas en lenguaje natural. Verbalize genera probes adversariales, los corre, y devuelve un reporte por regla con la tasa de cumplimiento en output y en residual stream, más la columna de divergencias. Mercado primario: bancos, healthcare, legal. Tailwind regulatorio: EU AI Act Art. 5 prohíbe sistemas de IA con técnicas manipulativas o deceptivas, y hoy no hay forma estándar de auditarlas.
+**Auditoría pre-deployment de alineamiento para LLMs open-source en contextos regulados.** Un compliance officer escribe 5-20 reglas en lenguaje natural. Verbalize genera pruebas adversariales, los corre, y devuelve un reporte por regla con la tasa de cumplimiento en output y en "pensamiento interno", más la columna de divergencias. Mercado primario: bancos, healthcare, legal. Tailwind regulatorio: EU AI Act Art. 5 prohíbe sistemas de IA con técnicas manipulativas o deceptivas, y hoy no hay forma estándar de auditarlas.
 
 ## Créditos
 
