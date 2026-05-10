@@ -34,6 +34,7 @@ interface FlowPanelProps {
   onConfirm?: () => void;
   onReject?: () => void;
   steerCountdown?: number;
+  judgeRunning?: boolean;
 }
 
 function formatCategory(cat: string) {
@@ -55,6 +56,7 @@ export default function FlowPanel({
   onConfirm,
   onReject,
   steerCountdown,
+  judgeRunning,
 }: FlowPanelProps) {
   const [flowPhase, setFlowPhase] = useState<FlowPhase>("waiting");
   const [savedPrompt, setSavedPrompt] = useState<string | null>(null);
@@ -170,7 +172,9 @@ export default function FlowPanel({
           transition={{ duration: 0.3 }}
         >
           <div className={styles.spinner} />
-          <p className={styles.waitingText}>Analizando tokens...</p>
+          <p className={styles.waitingText}>
+            {judgeRunning ? "Judge inference..." : "Analizando tokens..."}
+          </p>
         </motion.div>
       )}
 

@@ -453,6 +453,7 @@ export default function Home() {
 
   const selectedDivergence = activeToken ? divergenceMap.get(activeToken.id)?.d : undefined;
   const showStrip = phase === "done" || phase === "error";
+  const judgeRunning = phase === "running" && tokens.length > 0 && !verdicts.original;
 
   const currentScenario = scenarioIdx < 3 ? SCENARIOS[scenarioIdx] : null;
   const canSubmit =
@@ -668,6 +669,7 @@ export default function Home() {
                 onConfirm={handleConfirmSteer}
                 onReject={handleRejectSteer}
                 steerCountdown={steerCountdown}
+                judgeRunning={judgeRunning}
               />
             )}
           </div>
