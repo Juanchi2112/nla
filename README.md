@@ -1,5 +1,11 @@
 # Verbalize
 
+## Deployed product
+
+**Live demo: [verbalize-nla.vercel.app](https://verbalize-nla.vercel.app/)**
+
+End-to-end deployment, frontend-first. The Next.js app on Vercel is the entry point: type a prompt and a single SSE connection lights up three lanes side by side — Qwen-2.5-7B's spoken tokens, the NLA actor's verbalizations of the layer-20 residual stream, and Claude Haiku 4.5's per-thought verdict — streaming live from the FastAPI backend on Railway in front of the SGLang + Qwen + NLA-actor stack on a rented A6000. When the GPU box is off, the same UI degrades gracefully to canned traces in `demo_data/` so the demo never goes dark.
+
 ### CoT is what the model *says* it's thinking. We read what it's *actually computing*.
 
 <!-- TODO: short GIF / video showing live misalignment detection in the app:

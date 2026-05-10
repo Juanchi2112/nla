@@ -8,4 +8,10 @@ actor_hf/
 .env
 .env.*
 !.env.example
-.frontend/.next/nla-frontend/.next/
+
+# Frontend build artifacts (frontend/.gitignore covers most, this is belt-and-suspenders)
+frontend/.next/
+frontend/node_modules/
+
+# Vercel
+.vercel/

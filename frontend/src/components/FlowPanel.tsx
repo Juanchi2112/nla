@@ -140,6 +140,13 @@ export default function FlowPanel({
         seqRef.current = false;
       };
       seq();
+      return;
+    }
+
+    // Happy path: stream finished with PASS verdict (no divergences, no steer).
+    // Without this the panel would stay on "Analizando tokens..." forever.
+    if (phase === "done" && original) {
+      advance("output");
     }
   }, [original, steered, steerStatus, pendingSteer, correctionPrompt, phase]);
 
