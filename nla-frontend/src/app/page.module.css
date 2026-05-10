@@ -153,6 +153,57 @@
   .kpiTile:last-child { border-bottom: none; }
 }
 
+/* ========== DIFFERENCE TIRA (between hero and stage) ========== */
+.differenceTira {
+  padding-top: 64px !important;
+  padding-bottom: 32px !important;
+  position: relative;
+}
+.differenceTira::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.10) 18%,
+    rgba(240, 138, 62, 0.45) 50%,
+    rgba(255, 255, 255, 0.10) 82%,
+    transparent 100%
+  );
+}
+.differenceTiraTitle {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(28px, 3.4vw, 44px);
+  font-weight: var(--weight-semibold);
+  line-height: 1.18;
+  letter-spacing: -0.025em;
+  color: var(--fg);
+  max-width: 920px;
+}
+.differenceTiraTitle em {
+  font-style: italic;
+  color: var(--fg-secondary);
+  font-weight: var(--weight-regular);
+}
+.differenceTiraTitleAccent {
+  color: var(--accent);
+  font-style: normal;
+}
+.differenceTiraSub {
+  margin: var(--space-md) 0 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--fg-tertiary);
+  line-height: 1.6;
+  max-width: 720px;
+}
+
 /* ========== COMPARISON TABLE ========== */
 .compareLead {
   font-family: var(--font-serif);
@@ -280,6 +331,49 @@
   letter-spacing: 0.04em;
   color: var(--accent);
   text-transform: lowercase;
+}
+
+/* Group rows: black-box vs white-box bands inside the table */
+.compareGroupRow td {
+  padding: 16px 20px 10px;
+  background: rgba(255, 255, 255, 0.012);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+.compareGroupRow:hover td {
+  background: rgba(255, 255, 255, 0.012) !important;
+}
+.compareGroupLabel {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--fg-secondary);
+  padding: 3px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  margin-right: 12px;
+  vertical-align: middle;
+}
+.compareGroupLabelOurs {
+  color: var(--accent);
+  border-color: rgba(240, 138, 62, 0.55);
+  background: rgba(240, 138, 62, 0.08);
+  box-shadow: 0 0 14px rgba(240, 138, 62, 0.22);
+}
+.compareGroupHint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--fg-tertiary);
+  vertical-align: middle;
+}
+.compareGroupRowOurs td {
+  background: rgba(240, 138, 62, 0.04);
+  border-top: 1px solid rgba(240, 138, 62, 0.18);
+  border-bottom: 1px solid rgba(240, 138, 62, 0.18);
 }
 
 /* ========== HERO HEADER ========== */
