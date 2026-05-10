@@ -462,7 +462,7 @@ export default function Home() {
         </h1>
         <p className={styles.heroLead}>
           Auditoría de alineamiento para LLMs open-source. Leemos el{" "}
-          <em>residual stream</em> del modelo &mdash; no la cadena de pensamiento que escribe sabiendo
+          <em>residual stream</em>{" "}del modelo &mdash; no la cadena de pensamiento que escribe sabiendo
           que la van a leer.
         </p>
 
