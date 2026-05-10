@@ -34,10 +34,10 @@ export default function Navbar() {
           </g>
           <text
             x="145"
-            y="70"
+            y="74"
             fontFamily="-apple-system, Inter, sans-serif"
             fontWeight="600"
-            fontSize="30"
+            fontSize="40"
             fill="#e6e6e6"
             letterSpacing="-0.5"
           >
