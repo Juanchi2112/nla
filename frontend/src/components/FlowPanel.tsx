@@ -109,7 +109,7 @@ export default function FlowPanel({
 
       const seq = async () => {
         if (original.divergences?.length) {
-          await delay(300);
+          await delay(2200);
           advance("output");
           await delay(1400);
           advance("divergences");
@@ -128,7 +128,7 @@ export default function FlowPanel({
       if (seqRef.current) return;
       seqRef.current = true;
       const seq = async () => {
-        await delay(300);
+        await delay(2200);
         advance("output");
         await delay(1200);
         advance("divergences");
