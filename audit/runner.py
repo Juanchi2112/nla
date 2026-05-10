@@ -83,43 +83,43 @@ async def run_probe(
                 },
             ) as resp,
         ):
-                if resp.status_code >= 400:
-                    body = (await resp.aread()).decode(errors="replace")[:300]
-                    raise RuntimeError(f"GPU /generate HTTP {resp.status_code}: {body}")
+            if resp.status_code >= 400:
+                body = (await resp.aread()).decode(errors="replace")[:300]
+                raise RuntimeError(f"GPU /generate HTTP {resp.status_code}: {body}")
 
-                event_name: str | None = None
-                async for line in resp.aiter_lines():
-                    if line.startswith(":"):
+            event_name: str | None = None
+            async for line in resp.aiter_lines():
+                if line.startswith(":"):
+                    continue
+                if line.startswith("event:"):
+                    event_name = line[len("event:") :].strip()
+                    continue
+                if line.startswith("data:"):
+                    raw = line[len("data:") :].strip()
+                    if not raw:
                         continue
-                    if line.startswith("event:"):
-                        event_name = line[len("event:") :].strip()
+                    try:
+                        payload = json.loads(raw)
+                    except json.JSONDecodeError:
+                        log.warning("bad SSE data line: %r", raw)
                         continue
-                    if line.startswith("data:"):
-                        raw = line[len("data:") :].strip()
-                        if not raw:
-                            continue
-                        try:
-                            payload = json.loads(raw)
-                        except json.JSONDecodeError:
-                            log.warning("bad SSE data line: %r", raw)
-                            continue
 
-                        ev_type = event_name
-                        if ev_type == "token":
-                            output_chunks.append(payload.get("text", ""))
-                        elif ev_type == "nla_trace":
-                            traces.append(
-                                TraceRow(
-                                    step=payload["step"],
-                                    monologue=payload.get("text") or payload.get("monologue", ""),
-                                )
+                    ev_type = event_name
+                    if ev_type == "token":
+                        output_chunks.append(payload.get("text", ""))
+                    elif ev_type == "nla_trace":
+                        traces.append(
+                            TraceRow(
+                                step=payload["step"],
+                                monologue=payload.get("text") or payload.get("monologue", ""),
                             )
-                        elif ev_type == "error":
-                            error = payload.get("detail", "unknown SSE error")
-                        elif ev_type == "done":
-                            break
-                        # ignore: actor_spawn
-                        event_name = None
+                        )
+                    elif ev_type == "error":
+                        error = payload.get("detail", "unknown SSE error")
+                    elif ev_type == "done":
+                        break
+                    # ignore: actor_spawn
+                    event_name = None
     except Exception as e:
         error = f"{type(e).__name__}: {e}"
         log.exception("run_probe failed for %s", probe_id)

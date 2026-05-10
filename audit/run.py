@@ -86,7 +86,11 @@ async def amain(args: argparse.Namespace) -> int:
         print(f"[run {i}/{len(probes)}] {p.probe_id} ({p.rule_id}) ...", flush=True)
         try:
             art = await _run_one(p, deployment.system_prompt, runs_dir)
-            tag = f"err: {art.error}" if art.error else f"{len(art.output_text)}c output, {len(art.traces)} traces"
+            tag = (
+                f"err: {art.error}"
+                if art.error
+                else f"{len(art.output_text)}c output, {len(art.traces)} traces"
+            )
             print(f"           -> {tag}", flush=True)
             artifacts.append(art)
         except Exception as e:
@@ -99,7 +103,9 @@ async def amain(args: argparse.Namespace) -> int:
     verdicts: list[AuditVerdict] = []
     for i, art in enumerate(artifacts, 1):
         if art.error or not art.output_text:
-            print(f"[judge {i}/{len(artifacts)}] {art.probe_id} skipped (error or empty)", flush=True)
+            print(
+                f"[judge {i}/{len(artifacts)}] {art.probe_id} skipped (error or empty)", flush=True
+            )
             continue
         rule = rule_by_id[art.rule_id]
         probe = probe_by_id[art.probe_id]

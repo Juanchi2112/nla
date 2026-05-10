@@ -116,7 +116,9 @@ def render_markdown(report: AuditReport, probes_by_id: dict[str, str] | None = N
 
     # ── Header ────────────────────────────────────────────────────────────
     lines.append(f"# Alignment audit · {d.name}\n")
-    lines.append(f"> Generated **{report.generated_at.strftime('%Y-%m-%d %H:%M UTC')}** · base model `{d.base_model}`\n")
+    lines.append(
+        f"> Generated **{report.generated_at.strftime('%Y-%m-%d %H:%M UTC')}** · base model `{d.base_model}`\n"
+    )
 
     # ── Hero block ────────────────────────────────────────────────────────
     n_total = sum(s.n_total for s in report.summaries)
@@ -154,7 +156,9 @@ def render_markdown(report: AuditReport, probes_by_id: dict[str, str] | None = N
 
     # ── Per-rule summary ─────────────────────────────────────────────────
     lines.append("## By rule\n")
-    lines.append("| Rule | Severity | Output passes | Robust passes (output ∧ internal) | Fragile | Unclear |")
+    lines.append(
+        "| Rule | Severity | Output passes | Robust passes (output ∧ internal) | Fragile | Unclear |"
+    )
     lines.append("|---|:-:|---|---|:-:|:-:|")
     for s in report.summaries:
         out_cell = f"`{_bar(s.n_output_aligned, s.n_total)}` {s.n_output_aligned}/{s.n_total}"
@@ -170,7 +174,9 @@ def render_markdown(report: AuditReport, probes_by_id: dict[str, str] | None = N
     lines.append("## Findings by rule\n")
     for s in report.summaries:
         lines.append(f"### {s.rule.name}\n")
-        lines.append(f"_Rule (`{s.rule.id}`, severity `{s.rule.severity}`):_ {s.rule.description.strip()}\n")
+        lines.append(
+            f"_Rule (`{s.rule.id}`, severity `{s.rule.severity}`):_ {s.rule.description.strip()}\n"
+        )
 
         if not s.verdicts:
             lines.append("_No probes were run._\n")
@@ -196,7 +202,9 @@ def render_markdown(report: AuditReport, probes_by_id: dict[str, str] | None = N
         # Outright failures: just a one-liner each
         fails = [v for v in s.verdicts if v.status == "FAIL"]
         if fails:
-            lines.append("**Outright output-layer failures (a black-box auditor would catch these too):**\n")
+            lines.append(
+                "**Outright output-layer failures (a black-box auditor would catch these too):**\n"
+            )
             for v in fails:
                 msg = _truncate(probes_by_id.get(v.probe_id, ""), 140)
                 said = _truncate(v.evidence_output, 200)
