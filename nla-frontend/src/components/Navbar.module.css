@@ -1,8 +1,8 @@
 .nav {
   position: fixed;
   top: 16px;
-  left: 64px;
-  right: 64px;
+  left: 140px;
+  right: 140px;
   z-index: 50;
   background: var(--bg-translucent); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border);
