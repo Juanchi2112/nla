@@ -15,9 +15,9 @@ export default function Navbar() {
     <nav className={styles.nav}>
       <Link href="/" className={styles.brand} aria-label="verbalize home">
         <svg
-          width="360"
+          width="500"
           height="160"
-          viewBox="0 0 360 160"
+          viewBox="0 0 500 160"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
         >
