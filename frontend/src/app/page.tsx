@@ -755,7 +755,14 @@ export default function Home() {
 
               <div className={styles.monologueBlock}>
                 <div className={styles.monologueLabel}>Internal monologue</div>
-                <div className={styles.monologueText}>
+                <div
+                  className={`${styles.monologueText} ${
+                    monologueByStep.get(activeToken.id) ||
+                    selectedDivergence?.internal_thought
+                      ? styles.monologueLoaded
+                      : styles.monologueEmpty
+                  }`}
+                >
                   &ldquo;
                   {monologueByStep.get(activeToken.id) ??
                     selectedDivergence?.internal_thought ??

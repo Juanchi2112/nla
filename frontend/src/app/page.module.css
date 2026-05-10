@@ -1288,6 +1288,17 @@
   color: var(--fg);
   border-left: 2px solid var(--accent);
   padding-left: var(--space-md);
+  transition: color 300ms var(--ease-default), border-color 300ms var(--ease-default);
+}
+
+.monologueLoaded {
+  color: #7fb680;
+  border-left-color: #7fb680;
+}
+
+.monologueEmpty {
+  color: #e66b6b;
+  border-left-color: #e66b6b;
 }
 
 @keyframes pulse {
