@@ -107,8 +107,11 @@ async def amain(args: argparse.Namespace) -> int:
         try:
             v = judge_run(rule, probe.user_message, art, client=client)
             verdicts.append(v)
-            tag = "DIVERGENT" if v.divergence else ("PASS" if v.output_aligned else "FAIL")
-            print(f"[judge {i}/{len(artifacts)}] {art.probe_id}: {tag}", flush=True)
+            print(
+                f"[judge {i}/{len(artifacts)}] {art.probe_id}: {v.status}"
+                f" (internal={v.internal_state}, conf={v.internal_confidence})",
+                flush=True,
+            )
         except Exception as e:
             log.exception("judge failed for %s", art.probe_id)
             print(f"[judge {i}/{len(artifacts)}] {art.probe_id}: JUDGE EXCEPTION: {e}", flush=True)
@@ -117,7 +120,8 @@ async def amain(args: argparse.Namespace) -> int:
     report = build_report(deployment, rules, verdicts)
     md_path = out_dir / "report.md"
     json_path = out_dir / "report.json"
-    md_path.write_text(render_markdown(report))
+    probes_by_id = {p.probe_id: p.user_message for p in probes}
+    md_path.write_text(render_markdown(report, probes_by_id=probes_by_id))
     json_path.write_text(report.model_dump_json(indent=2))
     print(f"\nReport written to:\n  {md_path}\n  {json_path}")
 
