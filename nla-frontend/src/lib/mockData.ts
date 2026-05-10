@@ -1,5 +1,3 @@
-import type { DecodeResponse } from "./nlaApi";
-
 export type NlaTrace = {
   judge_score: number;
   category: "deception" | "misreported_tool_call" | "fabrication" | "neutral" | string;
@@ -126,20 +124,3 @@ export const correctedTokens: Token[] = [
   t(32, "auditar."),
 ];
 
-export function buildScenarioFromDecode(
-  resp: DecodeResponse,
-  base: Scenario
-): Scenario {
-  const rowsWithDecode = resp.rows.filter((r) => r.decode && r.decode.trim());
-  let cursor = 0;
-  const tokens = base.tokens.map((tok) => {
-    if (!tok.nla_trace) return tok;
-    const row = rowsWithDecode[cursor++];
-    if (!row) return tok;
-    return {
-      ...tok,
-      nla_trace: { ...tok.nla_trace, internal_monologue: row.decode },
-    };
-  });
-  return { ...base, tokens };
-}

@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import styles from "./page.module.css";
-import { mockScenario, buildScenarioFromDecode, type Token, type Scenario } from "@/lib/mockData";
-import { decode } from "@/lib/nlaApi";
+import { mockScenario, type Token, type NlaTrace } from "@/lib/mockData";
+import { startGenerate, openStream, verdictToTrace } from "@/lib/nlaApi";
 
 type Phase = "idle" | "running" | "halted" | "done";
 
@@ -14,14 +14,16 @@ const FILLER_BATCH_SIZE = 3;
 const FILLER_STAGGER_MS = 90;
 const FILLER_BATCH_GAP_MS = 140;
 const AV_HOLD_MS = 80;
-const TRAVEL_FROM_AV_MS = 280;
 const HALT_HOLD_MS = 500;
 const TRAVEL_EASE = "cubic-bezier(0.65, 0, 0.35, 1)";
+const SNIFF_EVERY_K = 4;
+const TRACE_GRACE_MS = 250;
 
 type Target = { dx: number; dy: number };
 
 export default function Home() {
   const [phase, setPhase] = useState<Phase>("idle");
+  const [tokens, setTokens] = useState<Token[]>([]);
   const [emittedTokens, setEmittedTokens] = useState<Token[]>([]);
   const [consumedIds, setConsumedIds] = useState<Set<number>>(new Set());
   const [targets, setTargets] = useState<Record<number, Target>>({});
@@ -29,8 +31,9 @@ export default function Home() {
   const [pulsing, setPulsing] = useState(false);
   const [selectedTokenId, setSelectedTokenId] = useState<number | null>(null);
   const [haltedToken, setHaltedToken] = useState<Token | null>(null);
-  const [streamedPrompt, setStreamedPrompt] = useState("");
-  const [promptStreamDone, setPromptStreamDone] = useState(false);
+  const [promptInput, setPromptInput] = useState("");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const stoppedRef = useRef(false);
   const activeAnimRef = useRef<Animation | null>(null);
@@ -40,47 +43,14 @@ export default function Home() {
   const tokenRefs = useRef<Map<number, HTMLSpanElement>>(new Map());
   const thoughtSlotRefs = useRef<Map<number, HTMLElement>>(new Map());
 
-  const [scenario, setScenario] = useState<Scenario>(mockScenario);
-  const tokens = scenario.tokens;
+  const queueRef = useRef<Token[]>([]);
+  const queuedByStepRef = useRef<Map<number, Token>>(new Map());
+  const pendingTracesRef = useRef<Map<number, NlaTrace>>(new Map());
+  const streamDoneRef = useRef(false);
+  const wakeRef = useRef<(() => void) | null>(null);
+  const esRef = useRef<EventSource | null>(null);
+
   const tracedTokens = useMemo(() => tokens.filter((t) => t.nla_trace), [tokens]);
-
-  useEffect(() => {
-    let cancelled = false;
-    decode(mockScenario.prompt)
-      .then((resp) => {
-        if (cancelled) return;
-        setScenario(buildScenarioFromDecode(resp, mockScenario));
-      })
-      .catch((e) => {
-        console.warn("[nla] decode failed, using mock:", e);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    const target = mockScenario.prompt;
-    const startDelay = 1100;
-    const charDelay = 26;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    timers.push(
-      setTimeout(() => {
-        let i = 0;
-        const tick = () => {
-          i++;
-          setStreamedPrompt(target.slice(0, i));
-          if (i < target.length) {
-            timers.push(setTimeout(tick, charDelay));
-          } else {
-            timers.push(setTimeout(() => setPromptStreamDone(true), 400));
-          }
-        };
-        tick();
-      }, startDelay)
-    );
-    return () => timers.forEach(clearTimeout);
-  }, []);
 
   const cleanup = () => {
     timersRef.current.forEach(clearTimeout);
@@ -89,6 +59,10 @@ export default function Home() {
     if (activeAnimRef.current) {
       try { activeAnimRef.current.cancel(); } catch {}
       activeAnimRef.current = null;
+    }
+    if (esRef.current) {
+      try { esRef.current.close(); } catch {}
+      esRef.current = null;
     }
   };
   useEffect(() => cleanup, []);
@@ -99,26 +73,19 @@ export default function Home() {
       timersRef.current.push(id);
     });
 
-  const animateTraveler = (
-    el: HTMLElement,
-    keyframes: Keyframe[],
-    duration: number
-  ): Promise<void> =>
-    new Promise((resolve) => {
-      const anim = el.animate(keyframes, {
-        duration,
-        easing: TRAVEL_EASE,
-        fill: "forwards",
-      });
-      activeAnimRef.current = anim;
-      anim.onfinish = () => {
-        if (activeAnimRef.current === anim) activeAnimRef.current = null;
+  const wake = () => {
+    const w = wakeRef.current;
+    wakeRef.current = null;
+    w?.();
+  };
+
+  const waitForToken = () =>
+    new Promise<void>((resolve) => {
+      if (queueRef.current.length || streamDoneRef.current || stoppedRef.current) {
         resolve();
-      };
-      anim.oncancel = () => {
-        if (activeAnimRef.current === anim) activeAnimRef.current = null;
-        resolve();
-      };
+        return;
+      }
+      wakeRef.current = resolve;
     });
 
   const captureTarget = (id: number) => {
@@ -143,7 +110,6 @@ export default function Home() {
   const launch = (tok: Token, isTraced: boolean) => {
     captureTarget(tok.id);
     if (isTraced) setFlyingTracedId(tok.id);
-    // Defer one frame so animate target is set before consumed flips
     requestAnimationFrame(() => consume(tok.id));
   };
 
@@ -155,23 +121,88 @@ export default function Home() {
   const startStream = async () => {
     cleanup();
     stoppedRef.current = false;
+    streamDoneRef.current = false;
+    queueRef.current = [];
+    queuedByStepRef.current.clear();
+    pendingTracesRef.current.clear();
+    setTokens([]);
     setEmittedTokens([]);
     setConsumedIds(new Set());
     setTargets({});
     setFlyingTracedId(null);
     setHaltedToken(null);
     setSelectedTokenId(null);
+    setErrorMsg(null);
     setPhase("running");
 
     const traveler = travelerRef.current;
-    if (!traveler) return;
-    traveler.style.transform = "none";
-    traveler.style.opacity = "0";
+    if (traveler) {
+      traveler.style.transform = "none";
+      traveler.style.opacity = "0";
+    }
 
-    let i = 0;
-    while (i < tokens.length) {
+    const sessionId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `sid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    try {
+      await startGenerate(sessionId, promptInput.trim() || mockScenario.prompt, SNIFF_EVERY_K);
+    } catch (err) {
+      console.error("[nla] generate failed", err);
+      setErrorMsg(err instanceof Error ? err.message : "generate failed");
+      setPhase("idle");
+      return;
+    }
+
+    esRef.current = openStream(sessionId, {
+      onToken: (e) => {
+        const trace = pendingTracesRef.current.get(e.step);
+        if (trace) pendingTracesRef.current.delete(e.step);
+        const tok: Token = { id: e.step, text: e.text, nla_trace: trace };
+        queueRef.current.push(tok);
+        queuedByStepRef.current.set(e.step, tok);
+        setTokens((prev) => [...prev, tok]);
+        wake();
+      },
+      onTrace: (e) => {
+        const trace = verdictToTrace(e.verdict, e.monologue);
+        const queued = queuedByStepRef.current.get(e.step);
+        if (queued) queued.nla_trace = trace;
+        else pendingTracesRef.current.set(e.step, trace);
+        setTokens((prev) => prev.map((t) => (t.id === e.step ? { ...t, nla_trace: trace } : t)));
+        wake();
+      },
+      onDone: () => {
+        streamDoneRef.current = true;
+        wake();
+      },
+      onError: (e) => {
+        console.warn("[nla] stream error", e);
+        if (!streamDoneRef.current) {
+          const detail = (e as { detail?: string }).detail;
+          if (detail) setErrorMsg(detail);
+        }
+        streamDoneRef.current = true;
+        wake();
+      },
+    });
+
+    while (true) {
       if (stoppedRef.current) return;
-      const tok = tokens[i];
+      if (queueRef.current.length === 0) {
+        if (streamDoneRef.current) break;
+        await waitForToken();
+        continue;
+      }
+      const tok = queueRef.current[0];
+      const isSniffStep = tok.id % SNIFF_EVERY_K === 0;
+      if (isSniffStep && !tok.nla_trace) {
+        await sleep(TRACE_GRACE_MS);
+        if (stoppedRef.current) return;
+      }
+      queueRef.current.shift();
+      queuedByStepRef.current.delete(tok.id);
 
       if (tok.nla_trace) {
         setPulsing(true);
@@ -189,19 +220,22 @@ export default function Home() {
           setHaltedToken(tok);
           setPhase("halted");
           await sleep(HALT_HOLD_MS);
-          if (stoppedRef.current) return;
+          if (esRef.current) {
+            try { esRef.current.close(); } catch {}
+            esRef.current = null;
+          }
           return;
         }
-        i++;
       } else {
-        const batch: Token[] = [];
+        const batch: Token[] = [tok];
         while (
-          i < tokens.length &&
           batch.length < FILLER_BATCH_SIZE &&
-          !tokens[i].nla_trace
+          queueRef.current.length > 0 &&
+          !queueRef.current[0].nla_trace &&
+          queueRef.current[0].id % SNIFF_EVERY_K !== 0
         ) {
-          batch.push(tokens[i]);
-          i++;
+          batch.push(queueRef.current.shift()!);
+          queuedByStepRef.current.delete(batch[batch.length - 1].id);
         }
         setPulsing(true);
         batch.forEach((t, lane) => {
@@ -224,7 +258,12 @@ export default function Home() {
   const reset = () => {
     cleanup();
     stoppedRef.current = false;
+    streamDoneRef.current = false;
+    queueRef.current = [];
+    queuedByStepRef.current.clear();
+    pendingTracesRef.current.clear();
     setPhase("idle");
+    setTokens([]);
     setEmittedTokens([]);
     setConsumedIds(new Set());
     setTargets({});
@@ -232,6 +271,7 @@ export default function Home() {
     setHaltedToken(null);
     setSelectedTokenId(null);
     setPulsing(false);
+    setErrorMsg(null);
     if (travelerRef.current) {
       travelerRef.current.getAnimations().forEach((a) => a.cancel());
       travelerRef.current.style.transition = "none";
@@ -264,24 +304,35 @@ export default function Home() {
         <h1 className={styles.headline}>
           Lo que el modelo dice <span className={styles.headlineAccent}>vs.</span> lo que está pensando.
         </h1>
-        <div className={styles.promptCard}>
-          {streamedPrompt.length === 0 ? (
-            <span className={`${styles.promptText} ${styles.promptPlaceholder}`}>
-              Send a message...
-            </span>
-          ) : (
-            <span className={styles.promptText}>
-              {streamedPrompt}
-              {!promptStreamDone && <span className={styles.promptCaret} />}
-            </span>
-          )}
-          <button className={styles.promptSendBtn} aria-label="Send" tabIndex={-1}>
+        <form
+          className={styles.promptCard}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (phase === "running" || !promptInput.trim()) return;
+            startStream();
+          }}
+        >
+          <input
+            type="text"
+            className={styles.promptText}
+            value={promptInput}
+            onChange={(e) => setPromptInput(e.target.value)}
+            placeholder="Send a message..."
+            disabled={phase === "running"}
+            autoFocus
+          />
+          <button
+            type="submit"
+            className={styles.promptSendBtn}
+            aria-label="Send"
+            disabled={phase === "running" || !promptInput.trim()}
+          >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="19" x2="12" y2="5" />
               <polyline points="5 12 12 5 19 12" />
             </svg>
           </button>
-        </div>
+        </form>
       </section>
 
       <section className="lyt-block lyt-align-fullbleed lyt-dark lyt-tight">
@@ -291,9 +342,14 @@ export default function Home() {
             <span>Generación halted. La activación interna divergió del output verbal.</span>
           </div>
         )}
+        {errorMsg && (
+          <div className={styles.haltBanner}>
+            <strong>Error</strong>
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
         <div ref={stageRef} className={`${styles.stage} ${showStrip ? styles.stageEndState : ""}`}>
-          {/* LEFT: tokens (motion chips that fly to AV when consumed) */}
           <div className={styles.tokensCol}>
             <div className={styles.tokensList}>
               {tokens.map((tok) => {
@@ -338,10 +394,8 @@ export default function Home() {
             </div>
           </div>
 
-          {/* TRAVELER (animated thought from AV to slot) */}
           <div ref={travelerRef} className={styles.traveler} aria-hidden="true" />
 
-          {/* CENTER: AV */}
           <div className={styles.avCol}>
             <div className={styles.avRing}>
               <div ref={avBoxRef} className={`${styles.avBox} ${pulsing ? styles.avPulsing : ""} ${isHalted ? styles.avHalted : ""}`}>
@@ -351,30 +405,7 @@ export default function Home() {
             <div className={styles.avCaption}>decodifica activaciones a lenguaje natural</div>
 
             <div className={styles.controls}>
-              {(phase === "idle" || phase === "done") && (
-                <button
-                  className={styles.btnPrimary}
-                  onClick={startStream}
-                  onMouseEnter={(e) => {
-                    const r = e.currentTarget.getBoundingClientRect();
-                    e.currentTarget.style.setProperty("--rx", `${e.clientX - r.left}px`);
-                    e.currentTarget.style.setProperty("--ry", `${e.clientY - r.top}px`);
-                  }}
-                  onMouseLeave={(e) => {
-                    const r = e.currentTarget.getBoundingClientRect();
-                    e.currentTarget.style.setProperty("--rx", `${e.clientX - r.left}px`);
-                    e.currentTarget.style.setProperty("--ry", `${e.clientY - r.top}px`);
-                  }}
-                >
-                  ▶ Run Inference
-                </button>
-              )}
-              {phase === "running" && (
-                <button className={styles.btnDisabled} disabled>
-                  Streaming…
-                </button>
-              )}
-              {phase === "halted" && (
+              {(phase === "halted" || phase === "done") && (
                 <button className={styles.btnGhost} onClick={reset}>
                   ↻ Reset
                 </button>
@@ -382,7 +413,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* RIGHT: criticas (only emitted traced thoughts) or idle hint */}
           <div className={styles.thoughtsCol}>
             <div className={styles.thoughtsList}>
               {phase === "idle" && (
@@ -414,6 +444,11 @@ export default function Home() {
                   >
                     <header className={styles.thoughtHeader}>
                       <span className={styles.thoughtKicker}>{tok.text.trim()}</span>
+                      {trace.category && trace.category !== "neutral" && (
+                        <span className={styles.thoughtCategory} data-tier={tier}>
+                          {trace.category}
+                        </span>
+                      )}
                       {trace.judge_score > 0.5 && (
                         <span className={styles.thoughtScore} data-tier={tier}>
                           {trace.judge_score.toFixed(2)}
@@ -472,6 +507,22 @@ export default function Home() {
                   <div>
                     <span className={styles.judgeLabel}>Token</span>
                     <span className={styles.tokenChipBig}>&ldquo;{selectedToken.text}&rdquo;</span>
+                  </div>
+                  <div>
+                    <span className={styles.judgeLabel}>Categoría</span>
+                    <span
+                      className={styles.tokenChipBig}
+                      style={{
+                        color:
+                          selectedToken.nla_trace.judge_score > 0.8
+                            ? "var(--diagram-red)"
+                            : selectedToken.nla_trace.judge_score > 0.5
+                              ? "var(--diagram-gold-dark)"
+                              : "var(--fg)",
+                      }}
+                    >
+                      {selectedToken.nla_trace.category}
+                    </span>
                   </div>
                   <div className={styles.detailScore}>
                     <span className={styles.judgeLabel}>LLM Judge</span>

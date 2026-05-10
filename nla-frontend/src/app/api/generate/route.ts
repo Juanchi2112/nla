@@ -4,17 +4,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type ClientBody = {
-  text: string;
-  skip_first?: number;
-  score?: boolean;
-  temperature?: number;
-  max_new_tokens?: number;
+  session_id: string;
+  prompt: string;
+  sniff_every_k?: number;
+  model?: string;
 };
 
 export async function POST(req: NextRequest) {
-  const gpuUrl = process.env.GPU_URL;
-  if (!gpuUrl) {
-    return NextResponse.json({ error: "GPU_URL not set" }, { status: 500 });
+  const backendUrl = process.env.BACKEND_URL;
+  if (!backendUrl) {
+    return NextResponse.json({ error: "BACKEND_URL not set" }, { status: 500 });
   }
 
   let body: ClientBody;
@@ -24,24 +23,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
 
-  if (!body.text || typeof body.text !== "string") {
-    return NextResponse.json({ error: "text required" }, { status: 400 });
+  if (!body.session_id || !body.prompt) {
+    return NextResponse.json({ error: "session_id and prompt required" }, { status: 400 });
   }
 
-  const skipFirstDefault = parseInt(process.env.GPU_SKIP_FIRST ?? "10", 10);
   const payload = {
-    text: body.text,
-    skip_first: body.skip_first ?? skipFirstDefault,
-    score: body.score ?? false,
-    temperature: body.temperature ?? 0.7,
-    max_new_tokens: body.max_new_tokens ?? 200,
+    session_id: body.session_id,
+    prompt: body.prompt,
+    sniff_every_k: body.sniff_every_k ?? 4,
+    ...(body.model ? { model: body.model } : {}),
   };
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
+  const timeout = setTimeout(() => controller.abort(), 30_000);
 
   try {
-    const upstream = await fetch(`${gpuUrl}/decode`, {
+    const upstream = await fetch(`${backendUrl}/api/generate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
@@ -57,7 +54,7 @@ export async function POST(req: NextRequest) {
       );
     }
     return new NextResponse(text, {
-      status: 200,
+      status: upstream.status,
       headers: { "content-type": "application/json" },
     });
   } catch (e: unknown) {
