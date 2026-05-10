@@ -23,7 +23,6 @@ Env (all optional except where noted):
     ANTHROPIC_API_KEY     required when JUDGE_BACKEND=claude
     ORCHESTRATOR_GPU      "mock" (default) | "decoder"
     GPU_URL               required when ORCHESTRATOR_GPU=decoder
-    GPU_SKIP_FIRST        "10"
     GPU_TIMEOUT           "120.0" seconds
     MAX_NEW_TOKENS        "128"
 """
@@ -74,7 +73,6 @@ JUDGE_BACKEND = os.environ.get("JUDGE_BACKEND", "regex").lower()
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "claude-haiku-4-5")
 ORCH_GPU = os.environ.get("ORCHESTRATOR_GPU", "mock").lower()
 GPU_URL = os.environ.get("GPU_URL", URL_PLACEHOLDER)
-GPU_SKIP_FIRST = int(os.environ.get("GPU_SKIP_FIRST", "10"))
 GPU_TIMEOUT = float(os.environ.get("GPU_TIMEOUT", "120.0"))
 MAX_NEW_TOKENS = int(os.environ.get("MAX_NEW_TOKENS", "128"))
 
@@ -84,11 +82,7 @@ def _build_gpu_client() -> GPUClient:
         return MockGPUClient()
     if ORCH_GPU == "decoder":
         # Raises GPUNotConfiguredError if GPU_URL is the placeholder.
-        return DecoderEndpointClient(
-            GPU_URL,
-            timeout=GPU_TIMEOUT,
-            skip_first=GPU_SKIP_FIRST,
-        )
+        return DecoderEndpointClient(GPU_URL, timeout=GPU_TIMEOUT)
     raise ValueError(f"unknown ORCHESTRATOR_GPU={ORCH_GPU!r}; expected 'mock' or 'decoder'")
 
 
@@ -195,8 +189,9 @@ async def _produce(state: AppState, session: SessionState) -> None:
                 reason = "cancelled"
                 break
 
-            # Emit any pending steer ack BEFORE the next token, so the
-            # frontend can render the cause→effect ordering cleanly.
+            # Emit any pending steer ack at the next item we see — could be
+            # token-only, monologue-only, or both. The step number tells the
+            # frontend where the steer took effect.
             if session.update_pending and session.active_rubric:
                 await queue.put(
                     (
@@ -210,16 +205,19 @@ async def _produce(state: AppState, session: SessionState) -> None:
                 )
                 session.update_pending = False
 
-            await queue.put(
-                (
-                    "token",
-                    TokenEvent(
-                        step=item.step,
-                        text=item.token,
-                    ).model_dump(),
+            # Token and monologue arrive independently from real-streaming GPUs
+            # (gpu/server.py /generate). Either or both may be present per item.
+            if item.token is not None:
+                await queue.put(
+                    (
+                        "token",
+                        TokenEvent(
+                            step=item.step,
+                            text=item.token,
+                        ).model_dump(),
+                    )
                 )
-            )
-            total += 1
+                total += 1
 
             if item.monologue is not None:
                 # When the session is steered, override the canned monologue
@@ -278,7 +276,6 @@ async def healthz(request: Request) -> dict[str, Any]:
         "gpu_backend": ORCH_GPU,
         "gpu_url_set": GPU_URL != URL_PLACEHOLDER,
         "gpu_url": GPU_URL if GPU_URL != URL_PLACEHOLDER else None,
-        "gpu_skip_first": GPU_SKIP_FIRST,
         "judge_backend": state.judge.backend,
         "judge_model": state.judge.model,
         "max_new_tokens": MAX_NEW_TOKENS,
