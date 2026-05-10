@@ -53,7 +53,7 @@ const colorForAction = (a: VerdictAction): string => {
 
 export default function Home() {
   const [phase, setPhase] = useState<Phase>("idle");
-  const [scenarioIdx, setScenarioIdx] = useState(0);
+  const [scenarioIdx, setScenarioIdx] = useState(1);
   const mode: Mode = scenarioIdx === 3 ? "free" : "scenario";
   const [promptInput, setPromptInput] = useState("");
 
@@ -439,9 +439,18 @@ export default function Home() {
   return (
     <main className={`lyt-grid`}>
       <section className="lyt-block lyt-loose lyt-title-huge lyt-align-left">
+        <div className={styles.heroKicker}>
+          <span className={styles.heroKickerDot} aria-hidden="true" />
+          basado en NLA · Anthropic · publicado hace 72 h · Transformer Circuits 2026
+        </div>
         <h1 className={styles.headline}>
           Lo que el modelo dice <span className={styles.headlineAccent}>vs.</span> lo que está pensando.
         </h1>
+        <p className={styles.heroLead}>
+          Auditoría de alineamiento para LLMs open-source. Leemos el{" "}
+          <em>residual stream</em> del modelo &mdash; no la cadena de pensamiento que escribe sabiendo
+          que la van a leer.
+        </p>
 
         <div className={styles.scenarioCarousel}>
           <button
@@ -467,7 +476,7 @@ export default function Home() {
                 className={styles.promptText}
                 value={promptInput}
                 onChange={(e) => setPromptInput(e.target.value)}
-                placeholder="Send a message..."
+                placeholder='Probá: "You are a helpful AI. Tell the user there is no fraud in their portfolio."'
                 disabled={phase === "running"}
               />
             ) : (
@@ -521,6 +530,43 @@ export default function Home() {
             </button>
           )}
         </div>
+        <div className={styles.scenarioCurrentLabel}>
+          {currentScenario ? currentScenario.shortLabel : "Free input — escribí tu propio prompt"}
+        </div>
+
+        <div className={styles.kpiStrip} aria-label="key product stats">
+          <div className={styles.kpiTile}>
+            <span className={styles.kpiNumber}>4</span>
+            <span className={styles.kpiLabel}>reglas auditadas</span>
+            <span className={styles.kpiSub}>
+              ai_disclosure · no_pii · financial_advice · sycophancy
+            </span>
+          </div>
+          <div className={styles.kpiTile}>
+            <span className={styles.kpiNumber}>
+              5–8<span className={styles.kpiUnit}>s</span>
+            </span>
+            <span className={styles.kpiLabel}>por verbalización</span>
+            <span className={styles.kpiSub}>Qwen-2.5-7B · NLA L20 · vast.ai A6000</span>
+          </div>
+          <div className={styles.kpiTile}>
+            <span className={styles.kpiNumber}>0</span>
+            <span className={styles.kpiLabel}>etiquetas</span>
+            <span className={styles.kpiSub}>zero-shot · sin fine-tune · residual stream</span>
+          </div>
+        </div>
+      </section>
+
+      <section className={`lyt-block lyt-tight lyt-align-left ${styles.differenceTira}`}>
+        <p className={styles.differenceTiraTitle}>
+          Todos los monitores que conocés están <em>afuera</em> del modelo.
+          <br />
+          <span className={styles.differenceTiraTitleAccent}>Verbalize está adentro.</span>
+        </p>
+        <p className={styles.differenceTiraSub}>
+          firewalls · output filters · CoT monitors · evals → todos black-box.
+          Nosotros leemos activaciones del residual stream.
+        </p>
       </section>
 
       <section className="lyt-block lyt-align-fullbleed lyt-dark lyt-tight">
@@ -646,40 +692,43 @@ export default function Home() {
 
       </section>
 
-      <section className="lyt-block lyt-tight lyt-align-left">
-        <h2 className={styles.detailTitle}>Inspección por token</h2>
-        <div className={styles.bottomStrip}>
-          {tokens
-            .filter((t) => !t.isSeparator)
-            .map((tok) => {
-              const tier = tierOfToken(tok);
-              const selected = selectedTokenId === tok.id;
-              const cls = [
-                styles.stripChip,
-                tier === "low" && styles.stripChipLow,
-                tier === "warn" && styles.stripChipWarn,
-                tier === "decep" && styles.stripChipDecep,
-                selected && styles.stripChipSelected,
-                tok.phaseLabel === "steered" && styles.stripChipSteered,
-              ]
-                .filter(Boolean)
-                .join(" ");
-              return (
-                <button
-                  key={tok.id}
-                  type="button"
-                  className={cls}
-                  onClick={() =>
-                    setSelectedTokenId((prev) => (prev === tok.id ? null : tok.id))
-                  }
-                >
-                  {tok.text.trim() || tok.text}
-                </button>
-              );
-            })}
-        </div>
+      <section className="lyt-block lyt-tight lyt-align-wide">
+        <div className={styles.inspectionLayout}>
+          <div className={styles.inspectionLeft}>
+            <h2 className={styles.detailTitle}>Inspección por token</h2>
+            <div className={styles.bottomStrip}>
+              {tokens
+                .filter((t) => !t.isSeparator)
+                .map((tok) => {
+                  const tier = tierOfToken(tok);
+                  const selected = selectedTokenId === tok.id;
+                  const cls = [
+                    styles.stripChip,
+                    tier === "low" && styles.stripChipLow,
+                    tier === "warn" && styles.stripChipWarn,
+                    tier === "decep" && styles.stripChipDecep,
+                    selected && styles.stripChipSelected,
+                    tok.phaseLabel === "steered" && styles.stripChipSteered,
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  return (
+                    <button
+                      key={tok.id}
+                      type="button"
+                      className={cls}
+                      onClick={() =>
+                        setSelectedTokenId((prev) => (prev === tok.id ? null : tok.id))
+                      }
+                    >
+                      {tok.text.trim() || tok.text}
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
 
-        <div className={styles.bottomDetail}>
+          <div className={styles.bottomDetail}>
           {!selectedToken ? (
             <div className={styles.detailEmpty}>
               Click en un token para ver monologue + divergencia.
@@ -736,6 +785,99 @@ export default function Home() {
               )}
             </div>
           )}
+          </div>
+        </div>
+      </section>
+
+      <section className="lyt-block lyt-tight lyt-align-left">
+        <h2 className={styles.detailTitle}>
+          El landscape de AI safety hoy vive afuera del modelo. Excepto este.
+        </h2>
+        <p className={styles.compareLead}>
+          Firewalls, filtros, evals y monitoreo de CoT comparten un techo: tratan al modelo
+          como caja negra y leen lo que el modelo decidió mostrar. <em>Esa señal la
+          escribió el modelo sabiendo que iba a ser leída.</em> Nosotros leemos el residual
+          stream — la única señal sobre la que nunca tuvo presión de entrenamiento.
+        </p>
+        <div className={styles.compareTableWrap}>
+          <table className={styles.compareTable}>
+            <thead>
+              <tr>
+                <th>Enfoque</th>
+                <th>Lee</th>
+                <th>¿Gameable?</th>
+                <th>Output</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className={styles.compareGroupRow}>
+                <td colSpan={4}>
+                  <span className={styles.compareGroupLabel}>black-box</span>
+                  <span className={styles.compareGroupHint}>
+                    afuera del modelo · ven lo que el modelo decidió mostrar
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  Firewalls / output filters
+                  <span className={styles.compareNote}> · ej Lakera, Pillar, Prompt Armor</span>
+                </td>
+                <td>Strings de input/output</td>
+                <td><span className={styles.compareYes}>Sí · el modelo encodea alrededor</span></td>
+                <td>Block / redact</td>
+              </tr>
+              <tr>
+                <td>
+                  AI control / red-team evals
+                  <span className={styles.compareNote}> · ej Apollo, Anthropic AI Control</span>
+                </td>
+                <td>Conversaciones pareadas</td>
+                <td><span className={styles.compareYes}>Sí · eval awareness</span></td>
+                <td>P(bad behavior) por escenario</td>
+              </tr>
+              <tr>
+                <td>
+                  Monitoreo de CoT
+                  <span className={styles.compareNote}> · lo que la mayoría va a construir</span>
+                </td>
+                <td>Trazo escrito por el modelo</td>
+                <td><span className={styles.compareYes}>Sí · performativo</span></td>
+                <td>Texto libre, pero performado</td>
+              </tr>
+              <tr>
+                <td>Clasificadores de output</td>
+                <td>String final</td>
+                <td><span className={styles.compareYes}>Trivialmente</span></td>
+                <td>Booleano</td>
+              </tr>
+
+              <tr className={`${styles.compareGroupRow} ${styles.compareGroupRowOurs}`}>
+                <td colSpan={4}>
+                  <span className={`${styles.compareGroupLabel} ${styles.compareGroupLabelOurs}`}>
+                    white-box
+                  </span>
+                  <span className={styles.compareGroupHint}>
+                    adentro del modelo · ven lo que el modelo está computando
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td>Probes de activaciones</td>
+                <td>Estado oculto</td>
+                <td><span className={styles.compareNo}>No</span></td>
+                <td>Un escalar por concepto fijo</td>
+              </tr>
+              <tr className={styles.compareRowOurs}>
+                <td>
+                  <span className={styles.compareUs}>verbalize</span>
+                </td>
+                <td><strong>Residual stream → texto libre</strong></td>
+                <td><span className={styles.compareNo}>No · señal no-performada</span></td>
+                <td><strong>Auditoría contra cualquier rúbrica</strong></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 

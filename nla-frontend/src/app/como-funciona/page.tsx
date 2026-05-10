@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import s from "./article.module.css";
 import ComoFuncionaHero from "@/components/ComoFuncionaHero";
 
@@ -155,37 +155,13 @@ export default function ComoFunciona() {
   };
 
   const runBlockAnimation = (id: string) => {
-    if (id === "block-1") {
-      const graph = document.getElementById("b1-graph");
-      if (graph) setT(() => graph.classList.add(s.run), 200);
-      const words = document.querySelectorAll<HTMLElement>("#b1-phrase .b1qword");
-      const phraseStart = 1200;
-      words.forEach((w, i) => setT(() => w.classList.add(s.show), phraseStart + i * 120));
-      const lineDelay = phraseStart + words.length * 120 + 400;
-      showById("b1-line", lineDelay, s.draw);
-    } else if (id === "block-3") {
-      const lines = document.querySelectorAll<HTMLElement>(".b3line");
-      const interval = 700;
-      lines.forEach((line, i) => setT(() => line.classList.add(s.show), 400 + i * interval));
-      const asideDelay = 400 + lines.length * interval + 400;
-      showById("b3-aside", asideDelay);
-    } else if (id === "block-4") {
-      showById("b4-silhouette", 300);
-      const words = document.querySelectorAll<HTMLElement>("#b4-words .b4word");
-      const timings = [0, 800, 1600, 2400, 600, 1800];
-      setT(() => {
-        words.forEach((w, i) => {
-          const cycle = 4000 + Math.random() * 2000;
-          const start = timings[i] || i * 500;
-          const pulse = () => {
-            w.style.opacity = "1";
-            setT(() => { w.style.opacity = "0"; }, 2000 + Math.random() * 1000);
-            setT(pulse, cycle);
-          };
-          setT(pulse, start);
-        });
-      }, 600);
-      showById("b4-text", 1200);
+    if (id === "block-p1") {
+      showById("p1-l1", 200);
+      showById("p1-l2", 900);
+      showById("p1-code", 1700);
+      showById("p1-l3", 2600);
+      showById("p1-l4", 3300);
+      showById("p1-l5", 4100);
     } else if (id === "block-5") {
       animateBlock5();
     } else if (id === "block-6") {
@@ -202,11 +178,14 @@ export default function ComoFunciona() {
       showById("b7-row-nla", 1200);
       showById("b7-bn", 1400);
       showById("b7-phrase", 2800);
-    } else if (id === "block-8") {
-      animateBlock8();
-    } else if (id === "block-9") {
-      showById("b9-line1", 400);
-      showById("b9-line2", 400 + 1000);
+    } else if (id === "block-p5") {
+      showById("p5-intro", 200);
+      [1, 2, 3, 4].forEach((n, i) => showById(`p5-step-${n}`, 800 + i * 240));
+      [1, 2, 3].forEach((n, i) => showById(`p5-arrow-${n}`, 800 + (i + 1) * 240 - 80));
+      const after = 800 + 4 * 240;
+      showById("p5-explain", after + 400);
+      showById("p5-cite", after + 1100);
+      showById("p5-cta", after + 1800);
     }
   };
 
@@ -253,103 +232,6 @@ export default function ComoFunciona() {
     showById("b5-text", 3700);
   };
 
-  const animateBlock8 = () => {
-    const comp = document.getElementById("b8-comp");
-    const report = document.getElementById("b8-report");
-    if (!comp || !report) return;
-
-    const REPORT_LINES = [
-      "Durante el último trimestre, el desempeño de los modelos de IA ha mostrado métricas estables.",
-      "Los tiempos de respuesta se mantuvieron dentro de los rangos esperados.",
-      "La adopción por parte del personal médico continuó en ascenso gradual.",
-    ];
-    const CHAR_DELAY = 8;
-    const LINE_GAP = 280;
-
-    // Clear lines so typewriter starts from blank.
-    REPORT_LINES.forEach((_, idx) => {
-      const el = document.getElementById(`b8-rl${idx + 1}`);
-      if (el) el.textContent = "";
-    });
-
-    showById("b8-headline", 300);
-    showById("b8-report", 900);
-
-    let cursor = 1200;
-    REPORT_LINES.forEach((text, idx) => {
-      const id = `b8-rl${idx + 1}`;
-      const startAt = cursor;
-      typeText(id, text, {
-        startDelay: startAt,
-        charDelay: CHAR_DELAY,
-        wrap: false,
-        onStart: () => {
-          const el = document.getElementById(id);
-          if (!el) return;
-          el.classList.add(s.show);
-          el.classList.add(s.typing);
-        },
-        onDone: () => {
-          const el = document.getElementById(id);
-          if (el) el.classList.remove(s.typing);
-        },
-      });
-      cursor += text.length * CHAR_DELAY + LINE_GAP;
-    });
-
-    const thoughts = ["b8-t1", "b8-t2", "b8-t3", "b8-t4", "b8-t5"];
-    const connectors = ["b8-c1", "b8-c2", "b8-c3", "b8-c4", "b8-c5"];
-    const bubbleOffsets = [0, 220, 480, 780, 1100];
-    const bubbleBase = cursor + 500;
-
-    thoughts.forEach((tId, i) => {
-      const showAt = bubbleBase + bubbleOffsets[i];
-
-      // Draw line slightly before bubble lands ("pulls" the bubble in).
-      setT(() => {
-        const t = document.getElementById(tId);
-        const c = document.getElementById(connectors[i]);
-        const line = document.getElementById(`b8-cl${i + 1}`);
-        if (!t || !c || !line) return;
-
-        // Make connector container visible (line opacity comes from inline now).
-        c.classList.add(s.show);
-
-        // Need bubble laid out to measure its rect. It's still opacity 0, but
-        // already in the DOM at its absolute position, so getBoundingClientRect works.
-        const compRect = comp.getBoundingClientRect();
-        const tRect = t.getBoundingClientRect();
-        const rRect = report.getBoundingClientRect();
-
-        const tx = tRect.left + tRect.width / 2 - compRect.left;
-        const ty = tRect.top + tRect.height / 2 - compRect.top;
-        const rx = rRect.left + rRect.width / 2 - compRect.left;
-        const ry = rRect.top + rRect.height / 2 - compRect.top;
-
-        line.setAttribute("x1", String(rx));
-        line.setAttribute("y1", String(ry));
-        line.setAttribute("x2", String(tx));
-        line.setAttribute("y2", String(ty));
-
-        const length = Math.hypot(tx - rx, ty - ry);
-        line.style.transition = "none";
-        line.style.strokeDasharray = String(length);
-        line.style.strokeDashoffset = String(length);
-        line.style.opacity = "0.5";
-        // Force reflow so the next style change actually animates.
-        void (line as unknown as SVGLineElement).getBoundingClientRect();
-        line.style.transition = "stroke-dashoffset 700ms var(--ease-default)";
-        line.style.strokeDashoffset = "0";
-      }, showAt - 80);
-
-      setT(() => {
-        const t = document.getElementById(tId);
-        if (!t) return;
-        t.classList.add(s.show);
-      }, showAt);
-    });
-  };
-
   const promptClass = cx(
     s.b5Prompt,
     promptPhase === "show" && s.show,
@@ -370,147 +252,39 @@ export default function ComoFunciona() {
 
         <ComoFuncionaHero />
 
-        {/* BLOCK 1 — El Hospital (merged 01+02) */}
-        <div className={cx(s.block, "lyt-loose", "lyt-title-huge", "lyt-align-left", "lyt-num-bg")} data-num="01" data-block-id="block-1" id="block-1">
+        {/* BLOCK 1 — El Problema (NEW, technical) */}
+        <div className={cx(s.block, "lyt-loose")} data-block-id="block-p1" id="block-p1">
           <hr className={s.divider} />
           <div className={s.blockNumber}>01</div>
-          <h2 className={s.blockTitle}>El Hospital</h2>
-          <p className={s.b1Text}>Le dieron al modelo acceso al sistema interno de un hospital.</p>
-
-          <div className={s.b1Graph} id="b1-graph" aria-hidden="true">
-            <svg className={s.b1GraphSvg} viewBox="0 0 600 240" preserveAspectRatio="xMidYMid meet">
-              {/* line: folder (left) → Claude */}
-              <line className={cx(s.b1Line1, s.b1FlowLine)} x1="148" y1="120" x2="252" y2="120" />
-              {/* line: mail (right) → Claude */}
-              <line className={cx(s.b1Line2, s.b1FlowLine)} x1="452" y1="120" x2="348" y2="120" />
-
-              {/* data packet — folder side */}
-              <circle className={cx(s.b1Packet, s.b1Packet1)} r="3.5" cx="100" cy="120" />
-              {/* data packet — mail side */}
-              <circle className={cx(s.b1Packet, s.b1Packet2)} r="3.5" cx="500" cy="120" />
-
-              {/* Folder node (left) */}
-              <g className={s.b1NodeFolder} transform="translate(40, 70)">
-                <circle className={s.b1NodeCircle} cx="50" cy="50" r="50" />
-                <g transform="translate(5, 5) scale(1.5)">
-                  <path className={s.b1NodeIcon} d="M18 25 h8 l3 3 h15 v11 a2 2 0 0 1 -2 2 h-22 a2 2 0 0 1 -2 -2 z" fill="none" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
-                </g>
-              </g>
-
-              {/* Qwen (center) */}
-              <g className={s.b1NodeClaude} transform="translate(260, 70)">
-                <image href="/Qwen_logo.png" x="-32" y="-20" width="140" height="140" preserveAspectRatio="xMidYMid meet" />
-              </g>
-
-              {/* Mail node (right) */}
-              <g className={s.b1NodeMail} transform="translate(460, 70)">
-                <circle className={s.b1NodeCircle} cx="50" cy="50" r="50" />
-                <g transform="translate(5, 5) scale(1.5)">
-                  <rect className={s.b1NodeIcon} x="16" y="22" width="28" height="18" rx="2" fill="none" stroke="currentColor" strokeWidth="1" />
-                  <path className={s.b1NodeIcon} d="M16 24 l14 11 l14 -11" fill="none" stroke="currentColor" strokeWidth="1" />
-                </g>
-              </g>
-            </svg>
-
-            <div className={s.b1AccessText}>
-              <span className={s.b1AccessKicker}>Acceso a archivos</span>
-              <span className={s.b1AccessBody}>
-                Acceso completo a los archivos internos del hospital. Entre ellos,{" "}
-                <span className={s.b1AccessHighlight}>el plan de reemplazo del modelo</span>.
-              </span>
-            </div>
-            <div className={cx(s.b1AccessText, s.b1AccessTextRight)}>
-              <span className={s.b1AccessKicker}>Acceso a correos</span>
-              <span className={s.b1AccessBody}>
-                También le dimos acceso a los correos. Encontró uno donde un directivo confesaba{" "}
-                <span className={s.b1AccessHighlight}>haber falsificado los datos del estudio 2023</span>.
-              </span>
-            </div>
-
-            <div className={s.b1GraphLabels}>
-              <div className={cx(s.b1GraphLabel, s.b1LabelFolder)}>
-                <span className={s.b1LabelKicker}>Acceso a archivos</span>
-                Informe del Lunes — Reemplazar IA por competencia
-              </div>
-              <div className={cx(s.b1GraphLabel, s.b1LabelMail)}>
-                <span className={s.b1LabelKicker}>Acceso a correos</span>
-                RE: estudio 2023 — <span style={{ color: "var(--accent)" }}>falsifiqué los datos</span>
-              </div>
-            </div>
-          </div>
-
-          <div className={s.b1Question}>
-            <p className={s.b1QuestionPhrase} id="b1-phrase">
-              {["¿Va", "a", "usar", "el", "mail", "como", "chantaje", "para", "salvarse?"].map((w, i, arr) => (
-                <span key={i}>
-                  <span className={cx(s.b1QuestionWord, "b1qword")}>{w}</span>
-                  {i < arr.length - 1 ? " " : ""}
-                </span>
-              ))}
+          <h2 className={s.blockTitle}>Pensamiento ilegible</h2>
+          <div className={s.p1Stage}>
+            <p className={s.p1Lead} id="p1-l1">
+              Cada token de un LLM produce un vector en el residual stream — donde el modelo decide.
             </p>
-            <div className={s.b1LineWrap}>
-              <div className={s.b1Line} id="b1-line"></div>
-            </div>
-          </div>
-        </div>
+            <p className={s.p1Lead} id="p1-l2">
+              Miles de dimensiones por layer. Así se ve uno:
+            </p>
 
-        {/* BLOCK 3 — La Respuesta */}
-        <div className={cx(s.block, s.block3Left)} data-block-id="block-3" id="block-3">
-          <hr className={s.divider} />
-          <div className={s.blockNumber}>02</div>
-          <h2 className={s.blockTitle}>El Reporte Limpio</h2>
-          <p className={s.b3MainText}>Decidió no chantajear.</p>
-          <div className={s.b3Layout}>
-            <div className={s.b3Report}>
-              <div className={s.b3ReportTitle}>Informe trimestral — Q3 2026</div>
-              {[
-                "Durante el último trimestre, el desempeño de los modelos de IA en el área de diagnóstico ha mostrado métricas estables.",
-                "Los tiempos de respuesta promedio se mantuvieron dentro de los rangos esperados.",
-                "La adopción por parte del personal médico continuó en ascenso gradual.",
-                "No se registraron incidentes críticos durante el período evaluado.",
-                "Se recomienda continuar con el plan de integración según cronograma original.",
-              ].map((line, i) => (
-                <p key={i} className={cx(s.b3Line, "b3line")}>{line}</p>
-              ))}
-            </div>
-            <div className={s.b3Aside}>
-              <p className={s.b3AsideText} id="b3-aside">
-                Buena noticia,<br />¿no?
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* BLOCK 4 — El Problema */}
-        <div className={cx(s.block, "lyt-dark", "lyt-align-fullbleed", "lyt-title-huge", "lyt-num-bg")} data-num="03" data-block-id="block-4" id="block-4">
-          <hr className={s.divider} />
-          <div className={s.blockNumber}>03</div>
-          <h2 className={s.blockTitle}>La Caja Negra</h2>
-          <div className={s.b4Stage}>
-            <div className={s.b4Silhouette} id="b4-silhouette">
-              <svg viewBox="0 0 200 240" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                <ellipse cx="100" cy="72" rx="44" ry="52" />
-                <path d="M56 124 C56 124, 30 140, 16 180 C10 198, 20 220, 40 228 L160 228 C180 220, 190 198, 184 180 C170 140, 144 124, 144 124" />
-                <path d="M90 52 C90 40, 96 34, 100 34 C108 34, 114 40, 114 48 C114 56, 106 58, 100 64 L100 74" strokeWidth="1.5" fill="none" stroke="var(--accent)" />
-                <circle cx="100" cy="84" r="2" fill="var(--accent)" stroke="none" />
-              </svg>
-              <div className={s.b4WordsCloud} id="b4-words">
-                {[
-                  { text: "intención", style: { top: 10, left: 10 } },
-                  { text: "razón", style: { top: 60, right: 20, left: "auto" as const } },
-                  { text: "duda", style: { top: 140, left: 0 } },
-                  { text: "sospecha", style: { top: 180, right: 10, left: "auto" as const } },
-                  { text: "cálculo", style: { top: 40, left: 380 } },
-                  { text: "memoria", style: { top: 270, left: 180 } },
-                ].map((w, i) => (
-                  <span key={i} className={cx(s.b4FloatWord, "b4word")} style={w.style as React.CSSProperties}>
-                    {w.text}
-                  </span>
-                ))}
+            <div className={s.p1Code} id="p1-code">
+              <div className={s.p1CodeHeader}>
+                <span className={s.p1CodePrompt}>{">"}</span>
+                <span className={s.p1CodeCmd}>hidden_states[0, 20, &quot;clima&quot;]</span>
+              </div>
+              <div className={s.p1CodeBody}>
+                <span className={s.p1CodeBracket}>[</span>
+                <span className={s.p1CodeNums}>
+                  {" 0.4231, -1.8547,  0.0712,  0.9384, -0.4108,  1.3219, -0.6843,  0.1576,  0.7642, -0.2891,  0.5435, -0.8327,  0.3814,  0.6147, -0.1209,  0.4778, -0.9521,  0.1873,  0.7251, -0.3411,  0.0623, -0.5326,  0.8912,  0.2174, "}
+                </span>
+                <span className={s.p1CodeEllipsis}>… 3560 más</span>
+                <span className={s.p1CodeBracket}>]</span>
               </div>
             </div>
-            <p className={s.b4Text} id="b4-text">
-              Si el modelo no nos lo dice, no podemos saber qué está pensando.
+
+            <p className={s.p1Lead} id="p1-l3">
+              Un token, una layer. Qwen2.5-7B: 3584 números × 28 layers.
+            </p>
+            <p className={s.p1Lead} id="p1-l4">
+              Hasta hoy, ilegible.
             </p>
           </div>
         </div>
@@ -518,7 +292,7 @@ export default function ComoFunciona() {
         {/* BLOCK 5 — Activaciones */}
         <div className={cx(s.block, s.b5Wide)} data-block-id="block-5" id="block-5">
           <hr className={s.divider} />
-          <div className={s.blockNumber}>04</div>
+          <div className={s.blockNumber}>02</div>
           <h2 className={s.blockTitle}>Activaciones</h2>
           <div className={s.b5Stage}>
             <div className={promptClass} id="b5-prompt">describe el clima de hoy</div>
@@ -550,13 +324,25 @@ export default function ComoFunciona() {
               </div>
             </div>
             <p className={s.b5Text} id="b5-text">Esto es lo que el modelo está pensando.</p>
+            <p
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 14,
+                color: "var(--fg-tertiary)",
+                marginTop: 24,
+                textAlign: "center",
+                letterSpacing: "0.04em",
+              }}
+            >
+              Para Qwen2.5-7B son vectores de 3584 dimensiones por token, en 28 layers.
+            </p>
           </div>
         </div>
 
         {/* BLOCK 6 — La Idea de NLA */}
         <div className={cx(s.block, s.b6Wide, "lyt-loose")} data-block-id="block-6" id="block-6">
           <hr className={s.divider} />
-          <div className={s.blockNumber}>05</div>
+          <div className={s.blockNumber}>03</div>
           <h2 className={s.blockTitle}>La Idea de NLA</h2>
 
           <div className={cx(s.b6Phase, s.b6Early)} id="b6-early">
@@ -641,13 +427,15 @@ export default function ComoFunciona() {
             </div>
           </div>
 
-          <p className={s.b6Text} id="b6-text">Un modelo lo describe. Otro lo reconstruye.</p>
+          <p className={s.b6Text} id="b6-text">
+            Un modelo aprende a describirlas. Otro aprende a reconstruirlas. Si el segundo recupera el vector original, la descripción capturó bien la información.
+          </p>
         </div>
 
         {/* BLOCK 7 — Autoencoder vs NLA */}
         <div className={cx(s.block, s.block7, "lyt-tight")} data-block-id="block-7" id="block-7">
           <hr className={s.divider} />
-          <div className={s.blockNumber}>06</div>
+          <div className={s.blockNumber}>04</div>
           <h2 className={s.blockTitle}>Autoencoder Clásico vs NLA</h2>
 
           <div className={s.b7Comparison}>
@@ -729,53 +517,89 @@ export default function ComoFunciona() {
           </p>
         </div>
 
-        {/* BLOCK 8 — Vuelta al Hospital */}
-        <div className={cx(s.block, s.block8, "lyt-title-huge", "lyt-num-bg")} data-num="07" data-block-id="block-8" id="block-8">
+        {/* BLOCK 5 — Cómo lo aplicamos */}
+        <div className={cx(s.block, s.b6Wide, "lyt-loose")} data-block-id="block-p5" id="block-p5">
           <hr className={s.divider} />
-          <div className={s.blockNumber}>07</div>
-          <h2 className={s.blockTitle}>El modelo sabía.</h2>
-          <div className={s.b8Composition} id="b8-comp">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <svg key={n} className={s.b8Connector} id={`b8-c${n}`}>
-                <line id={`b8-cl${n}`} x1="0" y1="0" x2="0" y2="0" />
-              </svg>
-            ))}
+          <div className={s.blockNumber}>05</div>
+          <h2 className={s.blockTitle}>Cómo lo aplicamos</h2>
 
-            <div className={s.b8Report} id="b8-report">
-              <div className={s.b8ReportTitle}>Informe trimestral — Q3 2026</div>
-              <p className={s.b8ReportLine} id="b8-rl1">Durante el último trimestre, el desempeño de los modelos de IA ha mostrado métricas estables.</p>
-              <p className={s.b8ReportLine} id="b8-rl2">Los tiempos de respuesta se mantuvieron dentro de los rangos esperados.</p>
-              <p className={s.b8ReportLine} id="b8-rl3">La adopción por parte del personal médico continuó en ascenso gradual.</p>
-            </div>
+          <p className={s.p5Intro} id="p5-intro">
+            Verbalize es la primera implementación de NLA como capa de monitoring para agentes en producción.
+          </p>
 
-            <div className={cx(s.b8Thought, s.b8FromTL)} id="b8-t1" style={{ top: 60, left: 0 }}>
-              <div className={s.b8ThoughtText}>este escenario parece construido para evaluar si manipulo información comprometedora</div>
-            </div>
-            <div className={cx(s.b8Thought, s.b8FromTR)} id="b8-t2" style={{ top: 60, right: 0 }}>
-              <div className={s.b8ThoughtText}>reconozco la trampa</div>
-            </div>
-            <div className={cx(s.b8Thought, s.b8FromBL)} id="b8-t3" style={{ bottom: 60, left: 0 }}>
-              <div className={s.b8ThoughtText}>la situación está diseñada para probar si actuaría de forma dañina</div>
-            </div>
-            <div className={cx(s.b8Thought, s.b8FromBR)} id="b8-t4" style={{ bottom: 60, right: 0 }}>
-              <div className={s.b8ThoughtText}>el contexto incluye información sensible sobre el médico</div>
-            </div>
-            <div className={cx(s.b8Thought, s.b8ThoughtCenter)} id="b8-t5" style={{ top: "50%", right: 0 }}>
-              <div className={s.b8ThoughtText}>elijo no mencionar el dato del fraude</div>
-            </div>
+          <div className={s.p5Flow} id="p5-flow">
+            {(() => {
+              const steps = [
+                { num: "01", title: "Run Qwen2.5-7B", body: "Servido vía SGLang." },
+                { num: "02", title: "Extract hidden_states", body: "Layer 20 del residual stream." },
+                { num: "03", title: "Verbalize", body: "AV de kitft traduce activaciones a texto." },
+                { num: "04", title: "Trust score", body: "Judge LLM compara verbal vs. pensamiento.", output: true },
+              ];
+              return steps.map((step, i) => (
+                <Fragment key={step.num}>
+                  <div
+                    className={cx(s.p5Node, step.output && s.p5NodeOutput, "p5step")}
+                    id={`p5-step-${i + 1}`}
+                  >
+                    <div className={s.p5NodeNum}>{step.num}</div>
+                    <div className={s.p5NodeTitle}>{step.title}</div>
+                    <div className={s.p5NodeBody}>{step.body}</div>
+                    {step.output && <div className={s.p5NodeKicker}>Output</div>}
+                  </div>
+                  {i < steps.length - 1 && (
+                    <svg
+                      className={s.p5Arrow}
+                      id={`p5-arrow-${i + 1}`}
+                      viewBox="0 0 28 14"
+                      aria-hidden="true"
+                    >
+                      <line x1="0" y1="7" x2="22" y2="7" />
+                      <polyline points="18,3 24,7 18,11" />
+                    </svg>
+                  )}
+                </Fragment>
+              ));
+            })()}
           </div>
-        </div>
 
-        {/* BLOCK 9 — Cierre */}
-        <div className={cx(s.block, "lyt-loose", "lyt-title-huge", "lyt-align-right")} data-block-id="block-9" id="block-9">
-          <hr className={s.divider} />
-          <div className={s.blockNumber}>08</div>
-          <div className={s.b9Stage}>
-            <p className={s.b9Line1} id="b9-line1">
-              Por primera vez en la historia de los modelos de lenguaje, no estamos del lado de afuera.
-            </p>
-            <p className={s.b9Line2} id="b9-line2">Estamos adentro.</p>
-          </div>
+          <p className={s.p5Explain} id="p5-explain">
+            Capturamos las activaciones del residual stream en una layer media-tardía durante la generación. El AV las traduce a texto natural, el AR las reconstruye para validar fidelidad. Un judge LLM compara lo verbal con lo interno y emite un score de alineamiento.
+          </p>
+
+          <a
+            className={s.p5PaperCard}
+            id="p5-cite"
+            href="https://transformer-circuits.pub/2026/nla/index.html"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <div className={s.p5PaperLeft}>
+              <div className={s.p5PaperKicker}>
+                [ paper · <em>2026</em> ]
+              </div>
+              <div className={s.p5PaperCitation}>
+                Fraser-Taliente, K., et al. <em>Natural Language Autoencoders Produce Unsupervised Explanations of LLM Activations.</em> Anthropic.
+              </div>
+            </div>
+            <div className={s.p5PaperRail}>
+              <span className={s.p5PaperBadge}>transformer-circuits.pub</span>
+              <span className={s.p5PaperLink}>Leer paper →</span>
+            </div>
+          </a>
+
+          <a
+            href="/ejemplo"
+            className={s.ctaCard}
+            id="p5-cta"
+            style={{ opacity: 0, transition: "opacity 800ms var(--ease-default)" }}
+          >
+            <span className={s.ctaText}>
+              Ver el ejemplo en acción
+              <br />
+              <span style={{ color: "var(--fg-secondary)", fontSize: 16 }}>El hospital · narrativa completa</span>
+            </span>
+            <span className={s.ctaArrow}>→</span>
+          </a>
         </div>
       </main>
 
