@@ -59,19 +59,19 @@ def test_healthz(client: TestClient):
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok"
-    assert body["gpu_backend"] == "mock"
-    # gpu_url_set may be True if .env happens to define GPU_URL — tests run
-    # in mock mode so the value is irrelevant. Just verify the field exists.
-    assert "gpu_url_set" in body
-    # Unified judge fields (per Fase D refactor).
+    # New mode field (per hybrid mode refactor).
+    assert body["mode"] == "mock"
+    assert body["scenario_active"] is False  # mock has no cached scenarios
+    assert body["live_active"] is True  # mock provides a live GPU stub
+    # Unified judge fields.
     assert "judge_active" in body
+    assert body["judge_active"] is False  # mock mode has no judge
     assert "judge_model" in body
     assert "judge_prompt_version" in body
     # Legacy fields must be gone.
     assert "judge_backend" not in body
     assert "judge_url" not in body
-    # In mock mode the live judge is not instantiated.
-    assert body["judge_active"] is False
+    assert "gpu_backend" not in body  # renamed to "mode"
 
 
 # ─── /api/generate validation (XOR, 422 paths) ─────────────────────────────
