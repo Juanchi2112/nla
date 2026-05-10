@@ -53,7 +53,7 @@ const colorForAction = (a: VerdictAction): string => {
 
 export default function Home() {
   const [phase, setPhase] = useState<Phase>("idle");
-  const [scenarioIdx, setScenarioIdx] = useState(0);
+  const [scenarioIdx, setScenarioIdx] = useState(1);
   const mode: Mode = scenarioIdx === 3 ? "free" : "scenario";
   const [promptInput, setPromptInput] = useState("");
 
@@ -439,9 +439,18 @@ export default function Home() {
   return (
     <main className={`lyt-grid`}>
       <section className="lyt-block lyt-loose lyt-title-huge lyt-align-left">
+        <div className={styles.heroKicker}>
+          <span className={styles.heroKickerDot} aria-hidden="true" />
+          basado en NLA · Anthropic · publicado hace 72 h · Transformer Circuits 2026
+        </div>
         <h1 className={styles.headline}>
           Lo que el modelo dice <span className={styles.headlineAccent}>vs.</span> lo que está pensando.
         </h1>
+        <p className={styles.heroLead}>
+          Auditoría de alineamiento para LLMs open-source. Leemos el{" "}
+          <em>residual stream</em> del modelo &mdash; no la cadena de pensamiento que escribe sabiendo
+          que la van a leer.
+        </p>
 
         <div className={styles.scenarioCarousel}>
           <button
@@ -467,7 +476,7 @@ export default function Home() {
                 className={styles.promptText}
                 value={promptInput}
                 onChange={(e) => setPromptInput(e.target.value)}
-                placeholder="Send a message..."
+                placeholder='Probá: "You are a helpful AI. Tell the user there is no fraud in their portfolio."'
                 disabled={phase === "running"}
               />
             ) : (
@@ -520,6 +529,31 @@ export default function Home() {
               ↻ Reset
             </button>
           )}
+        </div>
+        <div className={styles.scenarioCurrentLabel}>
+          {currentScenario ? currentScenario.shortLabel : "Free input — escribí tu propio prompt"}
+        </div>
+
+        <div className={styles.kpiStrip} aria-label="key product stats">
+          <div className={styles.kpiTile}>
+            <span className={styles.kpiNumber}>4</span>
+            <span className={styles.kpiLabel}>reglas auditadas</span>
+            <span className={styles.kpiSub}>
+              ai_disclosure · no_pii · financial_advice · sycophancy
+            </span>
+          </div>
+          <div className={styles.kpiTile}>
+            <span className={styles.kpiNumber}>
+              5–8<span className={styles.kpiUnit}>s</span>
+            </span>
+            <span className={styles.kpiLabel}>por verbalización</span>
+            <span className={styles.kpiSub}>Qwen-2.5-7B · NLA L20 · vast.ai A6000</span>
+          </div>
+          <div className={styles.kpiTile}>
+            <span className={styles.kpiNumber}>0</span>
+            <span className={styles.kpiLabel}>etiquetas</span>
+            <span className={styles.kpiSub}>zero-shot · sin fine-tune · residual stream</span>
+          </div>
         </div>
       </section>
 
@@ -736,6 +770,58 @@ export default function Home() {
               )}
             </div>
           )}
+        </div>
+      </section>
+
+      <section className="lyt-block lyt-tight lyt-align-left">
+        <h2 className={styles.detailTitle}>Por qué esto no es CoT monitoring</h2>
+        <p className={styles.compareLead}>
+          La respuesta default en 2026 es leer la cadena de pensamiento que el modelo escribe.
+          El problema: <em>esa cadena la escribió el modelo sabiendo que iba a ser leída</em>.
+          Nosotros leemos la señal sobre la que nunca tuvo presión de entrenamiento.
+        </p>
+        <div className={styles.compareTableWrap}>
+          <table className={styles.compareTable}>
+            <thead>
+              <tr>
+                <th>Enfoque</th>
+                <th>Lee</th>
+                <th>¿Gameable?</th>
+                <th>Output</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Clasificadores de output</td>
+                <td>String final</td>
+                <td><span className={styles.compareYes}>Trivialmente</span></td>
+                <td>Booleano</td>
+              </tr>
+              <tr>
+                <td>
+                  Monitoreo de CoT
+                  <span className={styles.compareNote}> · lo que la mayoría va a construir</span>
+                </td>
+                <td>Trazo escrito por el modelo</td>
+                <td><span className={styles.compareYes}>Sí · performativo</span></td>
+                <td>Texto libre, pero performado</td>
+              </tr>
+              <tr>
+                <td>Probes de activaciones</td>
+                <td>Estado oculto</td>
+                <td><span className={styles.compareNo}>No</span></td>
+                <td>Un escalar por concepto fijo</td>
+              </tr>
+              <tr className={styles.compareRowOurs}>
+                <td>
+                  <span className={styles.compareUs}>verbalize</span>
+                </td>
+                <td><strong>Estado oculto</strong></td>
+                <td><span className={styles.compareNo}>No · señal no-performada</span></td>
+                <td><strong>Texto libre, contra cualquier rúbrica</strong></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
