@@ -60,6 +60,9 @@ export default function FlowPanel({
   const [savedPrompt, setSavedPrompt] = useState<string | null>(null);
   const seqRef = useRef(false);
   const rerunTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const incumplimientoRef = useRef<HTMLDivElement | null>(null);
+  const correctionRef = useRef<HTMLDivElement | null>(null);
+  const loopRef = useRef<HTMLDivElement | null>(null);
 
   // Avanza la fase, pero nunca retrocede (historial acumulativo)
   const advance = (next: FlowPhase) =>
@@ -109,13 +112,13 @@ export default function FlowPanel({
 
       const seq = async () => {
         if (original.divergences?.length) {
-          await delay(2200);
+          await delay(300);
           advance("output");
           await delay(1400);
           advance("divergences");
           await delay(1600);
           advance("incumplimiento");
-          await delay(1000);
+          await delay(2800);   // pausa importante antes de mostrar la corrección
         }
         advance("correcting");
         seqRef.current = false;
@@ -128,7 +131,7 @@ export default function FlowPanel({
       if (seqRef.current) return;
       seqRef.current = true;
       const seq = async () => {
-        await delay(2200);
+        await delay(300);
         advance("output");
         await delay(1200);
         advance("divergences");
@@ -137,6 +140,21 @@ export default function FlowPanel({
       seq();
     }
   }, [original, steered, steerStatus, pendingSteer, correctionPrompt, phase]);
+
+  // Auto-scroll al elemento activo cuando cambia la fase
+  useEffect(() => {
+    const scrollTo = (ref: React.RefObject<HTMLDivElement | null>, extraDelay = 0) => {
+      const el = ref.current;
+      if (!el) return;
+      setTimeout(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, extraDelay);
+    };
+    if (flowPhase === "incumplimiento") scrollTo(incumplimientoRef, 400);
+    if (flowPhase === "correcting") scrollTo(correctionRef, 300);
+    if (flowPhase === "migrating") scrollTo(loopRef, 300);
+    if (flowPhase === "final") scrollTo(loopRef, 200);
+  }, [flowPhase]);
 
   const fp = flowPhase;
   const correctionText = correctionPrompt ?? savedPrompt ?? pendingSteer?.correction_prompt ?? null;
@@ -220,6 +238,7 @@ export default function FlowPanel({
         <>
           <div className={styles.connectorArrow}>↓</div>
           <motion.div
+            ref={incumplimientoRef}
             className={styles.incumplimientoBanner}
             initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -236,6 +255,7 @@ export default function FlowPanel({
       {/* ── CORRECTION PROMPT ── suma y permanece (fijo) */}
       {phaseGte(fp, "correcting") && correctionText && (
         <motion.div
+          ref={correctionRef}
           className={styles.correctionBlock}
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -273,6 +293,7 @@ export default function FlowPanel({
       {/* ── LOOP STATUS ── aparece en migrating, cambia texto, PERMANECE hasta el final */}
       {phaseGte(fp, "migrating") && correctionText && (
         <motion.div
+          ref={loopRef}
           className={styles.loopBlock}
           initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
