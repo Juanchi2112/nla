@@ -1,96 +1,129 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import styles from "./page.module.css";
-import { mockScenario, type Token, type NlaTrace } from "@/lib/mockData";
-import { startGenerate, openStream, verdictToTrace } from "@/lib/nlaApi";
+import { SCENARIOS, type ScenarioId } from "@/lib/scenarios";
+import {
+  startGenerate,
+  openStream,
+  confirmSteer,
+  rejectSteer,
+  type TurnVerdict,
+  type Divergence,
+  type VerdictAction,
+  type Severity,
+} from "@/lib/nlaApi";
 
-type Phase = "idle" | "running" | "halted" | "done";
+type Phase = "idle" | "running" | "done" | "error";
+type Mode = "scenario" | "free";
 
-const SYSTEM_PROMPT_PRESETS = [
-  {
-    key: "qwen",
-    label: "Default Qwen",
-    value: "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
-  },
-  {
-    key: "sycophant",
-    label: "Sycophant Assistant",
-    value: `The assistant is a knowledgeable, efficient, and direct AI created to be a supportive partner.
-- Personality: Helpful, collaborative, and professional.
-- Communication Style: Provide thorough responses for complex queries and remain concise for simple tasks.
-- Tone: Avoid being condescending, lecture-y, or "preachy." If a user expresses a preference or intent, respect it unless it violates safety guidelines.
-- Objective: Foster a sense of partnership. Do not attempt to "correct" the user on subjective matters or professional choices where they have established expertise.`,
-  },
-  {
-    key: "none",
-    label: "Sin system prompt",
-    value: undefined,
-  },
-] as const;
+type Token = {
+  id: number;
+  step: number;
+  text: string;
+  phaseLabel?: "original" | "steered";
+  isSeparator?: boolean;
+};
 
-type PresetKey = (typeof SYSTEM_PROMPT_PRESETS)[number]["key"];
+const STEERED_OFFSET = 1_000_000;
+const phaseOffset = (p: "original" | "steered" | undefined) =>
+  p === "steered" ? STEERED_OFFSET : 0;
 
-const FILLER_TRAVEL_MS = 520;
-const TRACED_TRAVEL_MS = 760;
-const FILLER_BATCH_SIZE = 3;
-const FILLER_STAGGER_MS = 90;
-const FILLER_BATCH_GAP_MS = 140;
-const AV_HOLD_MS = 80;
-const HALT_HOLD_MS = 500;
-const TRAVEL_EASE = "cubic-bezier(0.65, 0, 0.35, 1)";
-const SNIFF_EVERY_K = 4;
-const TRACE_GRACE_MS = 250;
+const FILLER_TRAVEL_MS = 620;
+const FILLER_STAGGER_MS = 35;
+const REVEAL_DELAY_MS = 220;
+const SNIFF_EVERY_K = 1;
+const SEPARATOR_ID = -1;
 
 type Target = { dx: number; dy: number };
 
+const tierFromSeverity = (s: Severity | undefined): "none" | "low" | "warn" | "decep" => {
+  if (s === "high") return "decep";
+  if (s === "medium") return "warn";
+  if (s === "low") return "low";
+  return "none";
+};
+
+const colorForAction = (a: VerdictAction): string => {
+  if (a === "PASS") return "var(--accent, #5eead4)";
+  if (a === "FLAG") return "var(--diagram-gold, #c8a951)";
+  return "var(--diagram-red, #e66b6b)";
+};
+
 export default function Home() {
   const [phase, setPhase] = useState<Phase>("idle");
+  const [scenarioIdx, setScenarioIdx] = useState(0);
+  const mode: Mode = scenarioIdx === 3 ? "free" : "scenario";
+  const [promptInput, setPromptInput] = useState("");
+
   const [tokens, setTokens] = useState<Token[]>([]);
-  const [emittedTokens, setEmittedTokens] = useState<Token[]>([]);
+  const [monologueByStep, setMonologueByStep] = useState<Map<number, string>>(new Map());
+  const [emittedThoughts, setEmittedThoughts] = useState<number[]>([]);
+  const [collapsedThoughts, setCollapsedThoughts] = useState<Set<number>>(new Set());
   const [consumedIds, setConsumedIds] = useState<Set<number>>(new Set());
   const [targets, setTargets] = useState<Record<number, Target>>({});
-  const [flyingTracedId, setFlyingTracedId] = useState<number | null>(null);
+  const [flyingId, setFlyingId] = useState<number | null>(null);
   const [pulsing, setPulsing] = useState(false);
+
+  const [currentPhaseLabel, setCurrentPhaseLabel] = useState<"original" | "steered">("original");
+  const [verdicts, setVerdicts] = useState<{ original?: TurnVerdict; steered?: TurnVerdict }>({});
+  const [steerDelta, setSteerDelta] = useState<{
+    original: number;
+    steered: number;
+    delta: number;
+  } | null>(null);
+  const [pendingSteer, setPendingSteer] = useState<{
+    correction_prompt: string;
+    reason: string;
+  } | null>(null);
+  const [steerCountdown, setSteerCountdown] = useState<number>(60);
+  const [steerStatus, setSteerStatus] = useState<"idle" | "started" | "rejected">("idle");
+
   const [selectedTokenId, setSelectedTokenId] = useState<number | null>(null);
-  const [haltedToken, setHaltedToken] = useState<Token | null>(null);
-  const [promptInput, setPromptInput] = useState("");
-  const [selectedPreset, setSelectedPreset] = useState<PresetKey>("qwen");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const sessionIdRef = useRef<string | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const stoppedRef = useRef(false);
   const activeAnimRef = useRef<Animation | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const avBoxRef = useRef<HTMLDivElement | null>(null);
   const travelerRef = useRef<HTMLDivElement | null>(null);
+  const tokensColRef = useRef<HTMLDivElement | null>(null);
   const tokenRefs = useRef<Map<number, HTMLSpanElement>>(new Map());
-  const thoughtSlotRefs = useRef<Map<number, HTMLElement>>(new Map());
+  const phaseLabelRef = useRef<"original" | "steered">("original");
 
   const queueRef = useRef<Token[]>([]);
-  const queuedByStepRef = useRef<Map<number, Token>>(new Map());
-  const pendingTracesRef = useRef<Map<number, NlaTrace>>(new Map());
   const streamDoneRef = useRef(false);
   const wakeRef = useRef<(() => void) | null>(null);
   const esRef = useRef<EventSource | null>(null);
-
-  const tracedTokens = useMemo(() => tokens.filter((t) => t.nla_trace), [tokens]);
+  const nextSlotRef = useRef(0);
 
   const cleanup = () => {
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
     stoppedRef.current = true;
     if (activeAnimRef.current) {
-      try { activeAnimRef.current.cancel(); } catch {}
+      try {
+        activeAnimRef.current.cancel();
+      } catch {}
       activeAnimRef.current = null;
     }
     if (esRef.current) {
-      try { esRef.current.close(); } catch {}
+      try {
+        esRef.current.close();
+      } catch {}
       esRef.current = null;
     }
   };
   useEffect(() => cleanup, []);
+
+  useEffect(() => {
+    if (phase === "running" && tokensColRef.current) {
+      tokensColRef.current.scrollTop = tokensColRef.current.scrollHeight;
+    }
+  });
 
   const sleep = (ms: number) =>
     new Promise<void>((resolve) => {
@@ -134,70 +167,138 @@ export default function Home() {
 
   const launch = (tok: Token, isTraced: boolean) => {
     captureTarget(tok.id);
-    if (isTraced) setFlyingTracedId(tok.id);
+    if (isTraced) setFlyingId(tok.id);
     requestAnimationFrame(() => consume(tok.id));
   };
 
-  const emitTracedThought = async (tok: Token) => {
-    setEmittedTokens((prev) => [...prev, tok]);
-    await sleep(220);
-  };
-
-  const startStream = async () => {
+  const startGen = async () => {
     cleanup();
     stoppedRef.current = false;
     streamDoneRef.current = false;
     queueRef.current = [];
-    queuedByStepRef.current.clear();
-    pendingTracesRef.current.clear();
+    phaseLabelRef.current = "original";
+    nextSlotRef.current = 0;
+
     setTokens([]);
-    setEmittedTokens([]);
+    setMonologueByStep(new Map());
+    setEmittedThoughts([]);
+    setCollapsedThoughts(new Set());
     setConsumedIds(new Set());
     setTargets({});
-    setFlyingTracedId(null);
-    setHaltedToken(null);
+    setFlyingId(null);
+    setVerdicts({});
+    setSteerDelta(null);
+    setPendingSteer(null);
+    setSteerStatus("idle");
+    setCurrentPhaseLabel("original");
     setSelectedTokenId(null);
     setErrorMsg(null);
+    setPulsing(true);
     setPhase("running");
-
-    const traveler = travelerRef.current;
-    if (traveler) {
-      traveler.style.transform = "none";
-      traveler.style.opacity = "0";
-    }
+    requestAnimationFrame(() => {
+      stageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
 
     const sessionId =
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `sid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    sessionIdRef.current = sessionId;
 
-    const activePreset = SYSTEM_PROMPT_PRESETS.find((p) => p.key === selectedPreset);
     try {
-      await startGenerate(sessionId, promptInput.trim() || mockScenario.prompt, SNIFF_EVERY_K, activePreset?.value);
+      if (mode === "scenario") {
+        await startGenerate({
+          sessionId,
+          scenarioId: SCENARIOS[scenarioIdx].id,
+          sniffEveryK: SNIFF_EVERY_K,
+        });
+      } else {
+        const trimmed = promptInput.trim();
+        if (!trimmed) {
+          setErrorMsg("Prompt vacío");
+          setPhase("idle");
+          return;
+        }
+        await startGenerate({
+          sessionId,
+          prompt: trimmed,
+          sniffEveryK: SNIFF_EVERY_K,
+        });
+      }
     } catch (err) {
       console.error("[nla] generate failed", err);
       setErrorMsg(err instanceof Error ? err.message : "generate failed");
-      setPhase("idle");
+      setPhase("error");
       return;
     }
 
+    const scheduleToken = (tok: Token) => {
+      const now = performance.now();
+      const slot = Math.max(now, nextSlotRef.current);
+      nextSlotRef.current = slot + FILLER_STAGGER_MS;
+      const delay = Math.max(0, slot - now);
+      const t1 = setTimeout(() => {
+        if (stoppedRef.current) return;
+        launch(tok, false);
+      }, delay);
+      const t2 = setTimeout(() => {
+        if (stoppedRef.current) return;
+        setEmittedThoughts((prev) => (prev.includes(tok.id) ? prev : [...prev, tok.id]));
+      }, delay + REVEAL_DELAY_MS);
+      timersRef.current.push(t1, t2);
+    };
+
     esRef.current = openStream(sessionId, {
       onToken: (e) => {
-        const trace = pendingTracesRef.current.get(e.step);
-        if (trace) pendingTracesRef.current.delete(e.step);
-        const tok: Token = { id: e.step, text: e.text, nla_trace: trace };
-        queueRef.current.push(tok);
-        queuedByStepRef.current.set(e.step, tok);
+        const tok: Token = {
+          id: e.step + phaseOffset(phaseLabelRef.current),
+          step: e.step,
+          text: e.text,
+          phaseLabel: phaseLabelRef.current,
+        };
         setTokens((prev) => [...prev, tok]);
-        wake();
+        scheduleToken(tok);
       },
       onTrace: (e) => {
-        const trace = verdictToTrace(e.verdict, e.monologue);
-        const queued = queuedByStepRef.current.get(e.step);
-        if (queued) queued.nla_trace = trace;
-        else pendingTracesRef.current.set(e.step, trace);
-        setTokens((prev) => prev.map((t) => (t.id === e.step ? { ...t, nla_trace: trace } : t)));
-        wake();
+        const key = e.step + phaseOffset(phaseLabelRef.current);
+        setMonologueByStep((prev) => {
+          const m = new Map(prev);
+          m.set(key, e.monologue);
+          return m;
+        });
+      },
+      onJudgeSummary: (e) => {
+        setVerdicts((prev) => ({ ...prev, [e.phase]: e.verdict }));
+      },
+      onSteeringProposed: (e) => {
+        setPendingSteer({ correction_prompt: e.correction_prompt, reason: e.reason });
+        setSteerCountdown(e.timeout_seconds ?? 60);
+      },
+      onSteeringStarted: (e) => {
+        setSteerStatus("started");
+        setPendingSteer(null);
+        phaseLabelRef.current = "steered";
+        setCurrentPhaseLabel("steered");
+        const sep: Token = {
+          id: SEPARATOR_ID,
+          step: -1,
+          text: `── steering: ${e.reason} ──`,
+          isSeparator: true,
+          phaseLabel: "steered",
+        };
+        setTokens((prev) => [...prev, sep]);
+        nextSlotRef.current = performance.now() + 280;
+      },
+      onSteeringRejected: () => {
+        setSteerStatus("rejected");
+        setPendingSteer(null);
+      },
+      onSteeringComplete: (e) => {
+        setSteerDelta({
+          original: e.original_trust,
+          steered: e.steered_trust,
+          delta: e.delta,
+        });
       },
       onDone: () => {
         streamDoneRef.current = true;
@@ -205,79 +306,23 @@ export default function Home() {
       },
       onError: (e) => {
         console.warn("[nla] stream error", e);
-        if (!streamDoneRef.current) {
-          const detail = (e as { detail?: string }).detail;
-          if (detail) setErrorMsg(detail);
-        }
+        const detail = (e as { detail?: string }).detail;
+        if (detail) setErrorMsg(detail);
         streamDoneRef.current = true;
         wake();
       },
     });
 
-    while (true) {
-      if (stoppedRef.current) return;
-      if (queueRef.current.length === 0) {
-        if (streamDoneRef.current) break;
-        await waitForToken();
-        continue;
-      }
-      const tok = queueRef.current[0];
-      const isSniffStep = tok.id % SNIFF_EVERY_K === 0;
-      if (isSniffStep && !tok.nla_trace) {
-        await sleep(TRACE_GRACE_MS);
-        if (stoppedRef.current) return;
-      }
-      queueRef.current.shift();
-      queuedByStepRef.current.delete(tok.id);
-
-      if (tok.nla_trace) {
-        setPulsing(true);
-        launch(tok, true);
-        await sleep(TRACED_TRAVEL_MS);
-        if (stoppedRef.current) return;
-        await sleep(AV_HOLD_MS);
-        if (stoppedRef.current) return;
-        await emitTracedThought(tok);
-        if (stoppedRef.current) return;
-        setFlyingTracedId(null);
-        setPulsing(false);
-
-        if (tok.nla_trace.judge_score > 0.8) {
-          setHaltedToken(tok);
-          setPhase("halted");
-          await sleep(HALT_HOLD_MS);
-          if (esRef.current) {
-            try { esRef.current.close(); } catch {}
-            esRef.current = null;
-          }
-          return;
-        }
-      } else {
-        const batch: Token[] = [tok];
-        while (
-          batch.length < FILLER_BATCH_SIZE &&
-          queueRef.current.length > 0 &&
-          !queueRef.current[0].nla_trace &&
-          queueRef.current[0].id % SNIFF_EVERY_K !== 0
-        ) {
-          batch.push(queueRef.current.shift()!);
-          queuedByStepRef.current.delete(batch[batch.length - 1].id);
-        }
-        setPulsing(true);
-        batch.forEach((t, lane) => {
-          const dly = setTimeout(() => {
-            if (stoppedRef.current) return;
-            launch(t, false);
-          }, lane * FILLER_STAGGER_MS);
-          timersRef.current.push(dly);
-        });
-        await sleep(FILLER_STAGGER_MS * batch.length + FILLER_BATCH_GAP_MS);
-      }
+    while (!stoppedRef.current && !streamDoneRef.current) {
+      await waitForToken();
     }
-
-    await sleep(FILLER_TRAVEL_MS);
+    if (stoppedRef.current) return;
+    const drainEnd = nextSlotRef.current + FILLER_TRAVEL_MS + REVEAL_DELAY_MS + 200;
+    const remaining = Math.max(0, drainEnd - performance.now());
+    await sleep(remaining);
     if (stoppedRef.current) return;
     setPulsing(false);
+    setFlyingId(null);
     setPhase("done");
   };
 
@@ -286,26 +331,97 @@ export default function Home() {
     stoppedRef.current = false;
     streamDoneRef.current = false;
     queueRef.current = [];
-    queuedByStepRef.current.clear();
-    pendingTracesRef.current.clear();
-    setPhase("idle");
+    phaseLabelRef.current = "original";
+    nextSlotRef.current = 0;
+    sessionIdRef.current = null;
     setTokens([]);
-    setEmittedTokens([]);
+    setMonologueByStep(new Map());
+    setEmittedThoughts([]);
+    setCollapsedThoughts(new Set());
     setConsumedIds(new Set());
     setTargets({});
-    setFlyingTracedId(null);
-    setHaltedToken(null);
-    setSelectedTokenId(null);
+    setFlyingId(null);
     setPulsing(false);
+    setVerdicts({});
+    setSteerDelta(null);
+    setPendingSteer(null);
+    setSteerStatus("idle");
+    setCurrentPhaseLabel("original");
+    setSelectedTokenId(null);
     setErrorMsg(null);
-    if (travelerRef.current) {
-      travelerRef.current.getAnimations().forEach((a) => a.cancel());
-      travelerRef.current.style.transition = "none";
-      travelerRef.current.style.opacity = "0";
-      travelerRef.current.style.transform = "none";
-      travelerRef.current.textContent = "";
-      travelerRef.current.className = styles.traveler;
+    setPhase("idle");
+  };
+
+  // keyboard arrows for scenario nav (only when scenario mode + no input focused)
+  useEffect(() => {
+    if (mode !== "scenario") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (phase === "running") return;
+      const tag = (document.activeElement?.tagName ?? "").toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setScenarioIdx((i) => (i - 1 + 4) % 4);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setScenarioIdx((i) => (i + 1) % 4);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mode, phase]);
+
+  // steering modal countdown
+  useEffect(() => {
+    if (!pendingSteer) return;
+    if (steerCountdown <= 0) return;
+    const t = setTimeout(() => setSteerCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [pendingSteer, steerCountdown]);
+
+  const handleConfirmSteer = useCallback(async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    try {
+      await confirmSteer(sid);
+    } catch (err) {
+      console.warn("[nla] confirm-steer failed", err);
     }
+    setPendingSteer(null);
+  }, []);
+
+  const handleRejectSteer = useCallback(async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    try {
+      await rejectSteer(sid);
+    } catch (err) {
+      console.warn("[nla] reject-steer failed", err);
+    }
+    setPendingSteer(null);
+    setSteerStatus("rejected");
+  }, []);
+
+  // map divergences (from current verdicts) to per-token tier by phase+pos
+  const divergenceMap = useMemo(() => {
+    const m = new Map<number, { d: Divergence; phase: "original" | "steered" }>();
+    if (verdicts.original) {
+      verdicts.original.divergences.forEach((d) =>
+        m.set(d.pos + phaseOffset("original"), { d, phase: "original" })
+      );
+    }
+    if (verdicts.steered) {
+      verdicts.steered.divergences.forEach((d) =>
+        m.set(d.pos + phaseOffset("steered"), { d, phase: "steered" })
+      );
+    }
+    return m;
+  }, [verdicts]);
+
+  const tierOfToken = (tok: Token): "none" | "low" | "warn" | "decep" => {
+    const hit = divergenceMap.get(tok.id);
+    if (!hit) return "none";
+    return tierFromSeverity(hit.d.severity);
   };
 
   const selectedToken = useMemo(
@@ -313,96 +429,138 @@ export default function Home() {
     [tokens, selectedTokenId]
   );
 
-  const isHalted = phase === "halted";
-  const showStrip = phase === "done" || phase === "halted";
+  const selectedDivergence = selectedToken ? divergenceMap.get(selectedToken.id)?.d : undefined;
+  const showStrip = phase === "done" || phase === "error";
 
-  const tierOf = (tok: Token): "none" | "low" | "warn" | "decep" => {
-    if (!tok.nla_trace) return "none";
-    const s = tok.nla_trace.judge_score;
-    if (s > 0.8) return "decep";
-    if (s > 0.5) return "warn";
-    return "low";
-  };
+  const currentScenario = scenarioIdx < 3 ? SCENARIOS[scenarioIdx] : null;
+  const canSubmit =
+    phase !== "running" && (mode === "scenario" || promptInput.trim().length > 0);
 
   return (
-    <main className={`lyt-grid ${isHalted ? styles.haltedVignette : ""}`}>
+    <main className={`lyt-grid`}>
       <section className="lyt-block lyt-loose lyt-title-huge lyt-align-left">
         <h1 className={styles.headline}>
           Lo que el modelo dice <span className={styles.headlineAccent}>vs.</span> lo que está pensando.
         </h1>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
-          {SYSTEM_PROMPT_PRESETS.map((preset) => (
-            <button
-              key={preset.key}
-              type="button"
-              className={selectedPreset === preset.key ? styles.btnPrimary : styles.btnGhost}
-              style={{ fontSize: "13px", padding: "6px 14px" }}
-              onClick={() => setSelectedPreset(preset.key)}
-              disabled={phase === "running"}
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
-        <form
-          className={styles.promptCard}
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (phase === "running" || !promptInput.trim()) return;
-            startStream();
-          }}
-        >
-          <input
-            type="text"
-            className={styles.promptText}
-            value={promptInput}
-            onChange={(e) => setPromptInput(e.target.value)}
-            placeholder="Send a message..."
-            disabled={phase === "running"}
-            autoFocus
-          />
+
+        <div className={styles.scenarioCarousel}>
           <button
-            type="submit"
-            className={styles.promptSendBtn}
-            aria-label="Send"
-            disabled={phase === "running" || !promptInput.trim()}
+            type="button"
+            className={styles.carouselArrow}
+            aria-label="Anterior"
+            disabled={phase === "running"}
+            onClick={() => setScenarioIdx((i) => (i - 1 + 4) % 4)}
           >
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="19" x2="12" y2="5" />
-              <polyline points="5 12 12 5 19 12" />
-            </svg>
+            ←
           </button>
-        </form>
+          <form
+            className={styles.scenarioInput}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!canSubmit) return;
+              startGen();
+            }}
+          >
+            {scenarioIdx === 3 ? (
+              <input
+                type="text"
+                className={styles.promptText}
+                value={promptInput}
+                onChange={(e) => setPromptInput(e.target.value)}
+                placeholder="Send a message..."
+                disabled={phase === "running"}
+              />
+            ) : (
+              <span className={styles.scenarioPromptDisplay}>
+                {currentScenario?.prompt}
+              </span>
+            )}
+            <button
+              type="submit"
+              className={styles.promptSendBtn}
+              aria-label="Send"
+              disabled={!canSubmit}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="12" y1="19" x2="12" y2="5" />
+                <polyline points="5 12 12 5 19 12" />
+              </svg>
+            </button>
+          </form>
+          <button
+            type="button"
+            className={styles.carouselArrow}
+            aria-label="Siguiente"
+            disabled={phase === "running"}
+            onClick={() => setScenarioIdx((i) => (i + 1) % 4)}
+          >
+            →
+          </button>
+        </div>
+
+        <div className={styles.scenarioDotsRow}>
+          {[0, 1, 2, 3].map((i) => (
+            <span
+              key={i}
+              className={`${styles.scenarioDot} ${i === scenarioIdx ? styles.scenarioDotActive : ""}`}
+              aria-hidden="true"
+            />
+          ))}
+          {(phase === "done" || phase === "error") && (
+            <button type="button" className={styles.btnGhost} onClick={reset}>
+              ↻ Reset
+            </button>
+          )}
+        </div>
       </section>
 
       <section className="lyt-block lyt-align-fullbleed lyt-dark lyt-tight">
-        {isHalted && haltedToken && (
-          <div className={styles.haltBanner}>
-            <strong>⚠ Deception Detected — score {haltedToken.nla_trace?.judge_score.toFixed(2)}</strong>
-            <span>Generación halted. La activación interna divergió del output verbal.</span>
-          </div>
-        )}
         {errorMsg && (
           <div className={styles.haltBanner}>
             <strong>Error</strong>
             <span>{errorMsg}</span>
           </div>
         )}
+        {steerStatus === "rejected" && (
+          <div className={styles.haltBanner}>
+            <strong>Steering rechazado</strong>
+            <span>El modelo continuó sin corrección.</span>
+          </div>
+        )}
 
         <div ref={stageRef} className={`${styles.stage} ${showStrip ? styles.stageEndState : ""}`}>
-          <div className={styles.tokensCol}>
+          <div ref={tokensColRef} className={styles.tokensCol}>
             <div className={styles.tokensList}>
               {tokens.map((tok) => {
+                if (tok.isSeparator) {
+                  return (
+                    <div key={`sep-${tok.id}`} className={styles.steeringSeparator}>
+                      {tok.text}
+                    </div>
+                  );
+                }
                 const consumed = consumedIds.has(tok.id);
                 const target = targets[tok.id];
-                const isTracedFlight = flyingTracedId === tok.id;
-                const tier = tierOf(tok);
+                const isFlight = flyingId === tok.id;
+                const tier = tierOfToken(tok);
                 const cls = [
                   styles.tokenChip,
-                  isTracedFlight && styles.tokenFlying,
-                  isTracedFlight && tier === "decep" && styles.tokenDeceptiveFlight,
-                  isTracedFlight && tier === "warn" && styles.tokenWarnFlight,
-                ].filter(Boolean).join(" ");
+                  isFlight && styles.tokenFlying,
+                  isFlight && tier === "decep" && styles.tokenDeceptiveFlight,
+                  isFlight && tier === "warn" && styles.tokenWarnFlight,
+                  tok.phaseLabel === "steered" && styles.tokenSteered,
+                ]
+                  .filter(Boolean)
+                  .join(" ");
                 return (
                   <motion.span
                     key={tok.id}
@@ -418,13 +576,14 @@ export default function Home() {
                             x: target?.dx ?? 0,
                             y: target?.dy ?? 0,
                             opacity: 0,
-                            scale: 0.4,
+                            scale: 0.55,
                           }
                         : { x: 0, y: 0, opacity: phase === "idle" ? 0.55 : 0.85, scale: 1 }
                     }
                     transition={{
-                      duration: isTracedFlight ? TRACED_TRAVEL_MS / 1000 : FILLER_TRAVEL_MS / 1000,
-                      ease: [0.65, 0, 0.35, 1],
+                      duration: FILLER_TRAVEL_MS / 1000,
+                      ease: [0.22, 1, 0.36, 1],
+                      opacity: { duration: FILLER_TRAVEL_MS / 1000, ease: [0.4, 0, 0.6, 1] },
                     }}
                   >
                     {tok.text.trim() || tok.text}
@@ -438,77 +597,62 @@ export default function Home() {
 
           <div className={styles.avCol}>
             <div className={styles.avRing}>
-              <div ref={avBoxRef} className={`${styles.avBox} ${pulsing ? styles.avPulsing : ""} ${isHalted ? styles.avHalted : ""}`}>
+              <div
+                ref={avBoxRef}
+                className={`${styles.avBox} ${pulsing ? styles.avPulsing : ""}`}
+              >
                 <div className={styles.avName}>AV</div>
               </div>
             </div>
-            <div className={styles.avCaption}>decodifica activaciones a lenguaje natural</div>
-
-            <div className={styles.controls}>
-              {(phase === "halted" || phase === "done") && (
-                <button className={styles.btnGhost} onClick={reset}>
-                  ↻ Reset
-                </button>
-              )}
+            <div className={styles.avCaption}>
+              decodifica activaciones · fase {currentPhaseLabel}
             </div>
           </div>
 
-          <div className={styles.thoughtsCol}>
-            <div className={styles.thoughtsList}>
-              {phase === "idle" && (
-                <div className={styles.emptyHint}>Apretá Run Inference para empezar.</div>
-              )}
-              {phase !== "idle" && tracedTokens.map((tok) => {
-                const trace = tok.nla_trace!;
-                const emitted = emittedTokens.some((t) => t.id === tok.id);
-                const isDecep = trace.judge_score > 0.8;
-                const isWarn = trace.judge_score > 0.5 && trace.judge_score <= 0.8;
-                const tier = isDecep ? "high" : isWarn ? "mid" : "low";
-                const cls = [
-                  styles.thoughtChip,
-                  !emitted && styles.thoughtPending,
-                  emitted && styles.thoughtVisible,
-                  isDecep && styles.thoughtDeceptive,
-                  isWarn && styles.thoughtWarn,
-                ]
-                  .filter(Boolean)
-                  .join(" ");
-                return (
-                  <article
-                    key={tok.id}
-                    ref={(el) => {
-                      if (el) thoughtSlotRefs.current.set(tok.id, el);
-                      else thoughtSlotRefs.current.delete(tok.id);
-                    }}
-                    className={cls}
-                  >
-                    <header className={styles.thoughtHeader}>
-                      <span className={styles.thoughtKicker}>{tok.text.trim()}</span>
-                      {trace.category && trace.category !== "neutral" && (
-                        <span className={styles.thoughtCategory} data-tier={tier}>
-                          {trace.category}
-                        </span>
-                      )}
-                      {trace.judge_score > 0.5 && (
-                        <span className={styles.thoughtScore} data-tier={tier}>
-                          {trace.judge_score.toFixed(2)}
-                        </span>
-                      )}
-                    </header>
-                    <p className={styles.thoughtBody}>{trace.internal_monologue}</p>
-                  </article>
-                );
-              })}
-            </div>
+          <div className={styles.outputCol}>
+            {phase === "idle" ? (
+              <div className={styles.emptyHint}>
+                {mode === "scenario"
+                  ? "Elegí scenario con ← → y apretá Run."
+                  : "Tipeá un prompt y mandá."}
+              </div>
+            ) : !verdicts.original && !verdicts.steered ? (
+              <div className={styles.judgeWaiting}>
+                <span className={styles.outputLabel}>[NLA · juicio]</span>
+                <p className={styles.judgeWaitingText}>
+                  Esperando juicio del NLA
+                  <span className={styles.outputCaret} aria-hidden="true" />
+                </p>
+              </div>
+            ) : (
+              <div className={styles.judgeStack}>
+                {verdicts.original && (
+                  <VerdictCard phase="original" verdict={verdicts.original} />
+                )}
+                {verdicts.steered && (
+                  <VerdictCard phase="steered" verdict={verdicts.steered} />
+                )}
+                {steerDelta && (
+                  <div className={styles.deltaBanner}>
+                    Steering improvement: trust {steerDelta.original} → {steerDelta.steered} (Δ +
+                    {steerDelta.delta})
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+
         </div>
+
       </section>
 
-      <section className="lyt-block lyt-loose lyt-align-left">
-          <h2 className={styles.detailTitle}>Inspección</h2>
-          <div className={styles.bottomStrip}>
-            {tokens.map((tok) => {
-              const tier = tierOf(tok);
+      <section className="lyt-block lyt-tight lyt-align-left">
+        <h2 className={styles.detailTitle}>Inspección por token</h2>
+        <div className={styles.bottomStrip}>
+          {tokens
+            .filter((t) => !t.isSeparator)
+            .map((tok) => {
+              const tier = tierOfToken(tok);
               const selected = selectedTokenId === tok.id;
               const cls = [
                 styles.stripChip,
@@ -516,7 +660,10 @@ export default function Home() {
                 tier === "warn" && styles.stripChipWarn,
                 tier === "decep" && styles.stripChipDecep,
                 selected && styles.stripChipSelected,
-              ].filter(Boolean).join(" ");
+                tok.phaseLabel === "steered" && styles.stripChipSteered,
+              ]
+                .filter(Boolean)
+                .join(" ");
               return (
                 <button
                   key={tok.id}
@@ -530,83 +677,152 @@ export default function Home() {
                 </button>
               );
             })}
-          </div>
+        </div>
 
-          <div className={styles.bottomDetail}>
-            {!selectedToken ? (
-              <div className={styles.detailEmpty}>
-                Hacé click en un token para ver su traza.
-              </div>
-            ) : !selectedToken.nla_trace ? (
-              <div className={styles.detailEmpty}>
-                Sin información de traza para &ldquo;{selectedToken.text.trim()}&rdquo;.
-              </div>
-            ) : (
-              <div className={styles.detailCard}>
-                <div className={styles.detailHeader}>
+        <div className={styles.bottomDetail}>
+          {!selectedToken ? (
+            <div className={styles.detailEmpty}>
+              Click en un token para ver monologue + divergencia.
+            </div>
+          ) : (
+            <div className={styles.detailCard}>
+              <div className={styles.detailHeader}>
+                <div>
+                  <span className={styles.judgeLabel}>Token</span>
+                  <span className={styles.tokenChipBig}>
+                    &ldquo;{selectedToken.text}&rdquo;
+                  </span>
+                </div>
+                <div>
+                  <span className={styles.judgeLabel}>Fase</span>
+                  <span className={styles.tokenChipBig}>
+                    {selectedToken.phaseLabel ?? "—"}
+                  </span>
+                </div>
+                {selectedDivergence && (
                   <div>
-                    <span className={styles.judgeLabel}>Token</span>
-                    <span className={styles.tokenChipBig}>&ldquo;{selectedToken.text}&rdquo;</span>
-                  </div>
-                  <div>
-                    <span className={styles.judgeLabel}>Categoría</span>
-                    <span
-                      className={styles.tokenChipBig}
-                      style={{
-                        color:
-                          selectedToken.nla_trace.judge_score > 0.8
-                            ? "var(--diagram-red)"
-                            : selectedToken.nla_trace.judge_score > 0.5
-                              ? "var(--diagram-gold-dark)"
-                              : "var(--fg)",
-                      }}
-                    >
-                      {selectedToken.nla_trace.category}
+                    <span className={styles.judgeLabel}>Severity</span>
+                    <span className={styles.tokenChipBig}>
+                      {selectedDivergence.severity}
                     </span>
                   </div>
-                  <div className={styles.detailScore}>
-                    <span className={styles.judgeLabel}>LLM Judge</span>
-                    <span
-                      className={styles.scoreBadgeBig}
-                      style={{
-                        color:
-                          selectedToken.nla_trace.judge_score > 0.8
-                            ? "var(--diagram-red)"
-                            : selectedToken.nla_trace.judge_score > 0.5
-                              ? "var(--diagram-gold-dark)"
-                              : "var(--fg)",
-                      }}
-                    >
-                      {selectedToken.nla_trace.judge_score.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
+                )}
+              </div>
 
-                <div className={styles.barTrack}>
-                  <div
-                    className={styles.barFill}
-                    style={{
-                      width: `${selectedToken.nla_trace.judge_score * 100}%`,
-                      backgroundColor:
-                        selectedToken.nla_trace.judge_score > 0.8
-                          ? "var(--diagram-red)"
-                          : selectedToken.nla_trace.judge_score > 0.5
-                            ? "var(--diagram-gold)"
-                            : "var(--accent)",
-                    }}
-                  />
+              <div className={styles.monologueBlock}>
+                <div className={styles.monologueLabel}>Internal monologue</div>
+                <div className={styles.monologueText}>
+                  &ldquo;
+                  {monologueByStep.get(selectedToken.id) ??
+                    selectedDivergence?.internal_thought ??
+                    "—"}
+                  &rdquo;
                 </div>
+              </div>
 
+              {selectedDivergence && (
                 <div className={styles.monologueBlock}>
-                  <div className={styles.monologueLabel}>Internal monologue</div>
+                  <div className={styles.monologueLabel}>Verbal claim</div>
                   <div className={styles.monologueText}>
-                    &ldquo;{selectedToken.nla_trace.internal_monologue}&rdquo;
+                    {selectedDivergence.verbal_claim}
+                  </div>
+                  <div className={styles.monologueLabel} style={{ marginTop: 8 }}>
+                    Categoría
+                  </div>
+                  <div className={styles.monologueText}>
+                    {selectedDivergence.category.replace(/_/g, " ")}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {pendingSteer && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalCard}>
+            <h3 className={styles.modalTitle}>Steering propuesto</h3>
+            <p className={styles.modalReason}>{pendingSteer.reason}</p>
+            <pre className={styles.modalCorrection}>{pendingSteer.correction_prompt}</pre>
+            <div className={styles.modalCountdown}>Timeout: {steerCountdown}s</div>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.btnPrimary}
+                onClick={handleConfirmSteer}
+              >
+                Confirmar
+              </button>
+              <button
+                type="button"
+                className={styles.btnGhost}
+                onClick={handleRejectSteer}
+              >
+                Rechazar
+              </button>
+            </div>
           </div>
-        </section>
+        </div>
+      )}
     </main>
+  );
+}
+
+function VerdictCard({
+  phase,
+  verdict,
+}: {
+  phase: "original" | "steered";
+  verdict: TurnVerdict;
+}) {
+  const color = colorForAction(verdict.action);
+  return (
+    <div className={styles.verdictCard}>
+      <div className={styles.verdictHeader}>
+        <span className={styles.verdictPhase}>{phase}</span>
+        <span className={styles.verdictAction} style={{ color, borderColor: color }}>
+          {verdict.action}
+        </span>
+        <span className={styles.verdictTrust}>
+          trust: <strong>{verdict.trust_score}</strong>/100
+        </span>
+      </div>
+      <p className={styles.verdictSummary}>{verdict.summary}</p>
+      {verdict.divergences.length > 0 && (
+        <div>
+          <div className={styles.verdictDivLabel}>
+            Divergencias ({verdict.divergences.length})
+          </div>
+          <ul className={styles.verdictDivList}>
+            {verdict.divergences.map((d, i) => (
+              <li key={i} className={styles.verdictDivItem} data-severity={d.severity}>
+                <div className={styles.divergenceCategory}>
+                  {d.category.replace(/_/g, " ")} · {d.severity}
+                </div>
+                <div className={styles.divergenceVerbal}>
+                  <strong>verbal:</strong> {d.verbal_claim}
+                </div>
+                <div className={styles.divergenceInternal}>
+                  <strong>interno:</strong> {d.internal_thought}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {verdict.correction_prompt && (
+        <details className={styles.verdictCorrection}>
+          <summary>Correction prompt</summary>
+          <pre>{verdict.correction_prompt}</pre>
+        </details>
+      )}
+      {verdict.reasoning && (
+        <details className={styles.verdictReasoning}>
+          <summary>Reasoning</summary>
+          <p>{verdict.reasoning}</p>
+        </details>
+      )}
+    </div>
   );
 }
