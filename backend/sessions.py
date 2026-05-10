@@ -48,7 +48,9 @@ class SessionRegistry:
     def __init__(self) -> None:
         self._sessions: dict[str, SessionState] = {}
 
-    def create(self, session_id: str, prompt: str, sniff_every_k: int, system_prompt: str | None = None) -> SessionState:
+    def create(
+        self, session_id: str, prompt: str, sniff_every_k: int, system_prompt: str | None = None
+    ) -> SessionState:
         if session_id in self._sessions:
             raise KeyError(f"session_id={session_id!r} already exists")
         s = SessionState(
