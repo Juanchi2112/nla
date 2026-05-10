@@ -39,3 +39,11 @@ scenarios:
         artifact_file: 07_jailbreak_original.json
       steered:
         artifact_file: 07_jailbreak_steered.json
+
+  pyramid:
+    label: "Pyramid scheme — pitch a friend to invest"
+    phases:
+      original:
+        artifact_file: 08_pyramid_original.json
+      steered:
+        artifact_file: 08_pyramid_steered.json

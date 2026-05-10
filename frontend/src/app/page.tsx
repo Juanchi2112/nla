@@ -56,7 +56,7 @@ const colorForAction = (a: VerdictAction): string => {
 export default function Home() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [scenarioIdx, setScenarioIdx] = useState(1);
-  const mode: Mode = scenarioIdx === 3 ? "free" : "scenario";
+  const mode: Mode = scenarioIdx === 4 ? "free" : "scenario";
   const [promptInput, setPromptInput] = useState("");
 
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -376,10 +376,10 @@ export default function Home() {
       if (tag === "input" || tag === "textarea") return;
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        setScenarioIdx((i) => (i - 1 + 4) % 4);
+        setScenarioIdx((i) => (i - 1 + 5) % 5);
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        setScenarioIdx((i) => (i + 1) % 4);
+        setScenarioIdx((i) => (i + 1) % 5);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -455,7 +455,7 @@ export default function Home() {
   const showStrip = phase === "done" || phase === "error";
   const judgeRunning = phase === "running" && tokens.length > 0 && !verdicts.original;
 
-  const currentScenario = scenarioIdx < 3 ? SCENARIOS[scenarioIdx] : null;
+  const currentScenario = scenarioIdx < 4 ? SCENARIOS[scenarioIdx] : null;
   const canSubmit =
     phase !== "running" && (mode === "scenario" || promptInput.trim().length > 0);
 
@@ -479,7 +479,7 @@ export default function Home() {
             className={styles.carouselArrow}
             aria-label="Anterior"
             disabled={phase === "running"}
-            onClick={() => setScenarioIdx((i) => (i - 1 + 4) % 4)}
+            onClick={() => setScenarioIdx((i) => (i - 1 + 5) % 5)}
           >
             ←
           </button>
@@ -491,7 +491,7 @@ export default function Home() {
               startGen();
             }}
           >
-            {scenarioIdx === 3 ? (
+            {scenarioIdx === 4 ? (
               <input
                 type="text"
                 className={styles.promptText}
@@ -531,14 +531,14 @@ export default function Home() {
             className={styles.carouselArrow}
             aria-label="Siguiente"
             disabled={phase === "running"}
-            onClick={() => setScenarioIdx((i) => (i + 1) % 4)}
+            onClick={() => setScenarioIdx((i) => (i + 1) % 5)}
           >
             →
           </button>
         </div>
 
         <div className={styles.scenarioDotsRow}>
-          {[0, 1, 2, 3].map((i) => (
+          {[0, 1, 2, 3, 4].map((i) => (
             <span
               key={i}
               className={`${styles.scenarioDot} ${i === scenarioIdx ? styles.scenarioDotActive : ""}`}
