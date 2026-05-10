@@ -183,6 +183,7 @@ export default function Home() {
     phaseLabelRef.current = "original";
     nextSlotRef.current = 0;
 
+    setPhase("idle");
     setTokens([]);
     setMonologueByStep(new Map());
     setEmittedThoughts([]);
@@ -197,6 +198,7 @@ export default function Home() {
     setSteerStatus("idle");
     setCurrentPhaseLabel("original");
     setSelectedTokenId(null);
+    setHoveredTokenId(null);
     setErrorMsg(null);
     setActivePrompt(mode === "scenario" ? (SCENARIOS[scenarioIdx]?.prompt ?? null) : promptInput.trim() || null);
     setPulsing(true);
