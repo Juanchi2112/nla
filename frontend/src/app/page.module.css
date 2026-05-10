@@ -712,6 +712,36 @@
   align-self: stretch;
 }
 
+.activePromptBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: 4px;
+  width: 100%;
+}
+
+.activePromptLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--fg-tertiary);
+}
+
+.activePromptText {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--fg-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .tokensList {
   display: flex;
   flex-wrap: wrap;
@@ -1292,13 +1322,13 @@
 }
 
 .monologueLoaded {
-  color: #7fb680;
-  border-left-color: #7fb680;
+  color: var(--fg);
+  border-left-color: var(--accent);
 }
 
 .monologueEmpty {
-  color: #e66b6b;
-  border-left-color: #e66b6b;
+  color: var(--fg);
+  border-left-color: var(--accent);
 }
 
 @keyframes pulse {
@@ -1407,6 +1437,19 @@
   color: #ff8a8a;
   background: rgba(230, 107, 107, 0.12);
   text-shadow: 0 0 16px rgba(230, 107, 107, 0.55);
+}
+
+.proseWordLoaded {
+  color: #7fb680;
+  text-decoration: underline dotted rgba(127, 182, 128, 0.5);
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+.proseWordLoaded:hover,
+.proseWordLoaded:focus-visible {
+  color: #9dd9a0;
+  background: rgba(127, 182, 128, 0.1);
+  text-shadow: 0 0 14px rgba(127, 182, 128, 0.45);
 }
 
 .proseWordHovered {

@@ -85,6 +85,7 @@ export default function Home() {
   const [selectedTokenId, setSelectedTokenId] = useState<number | null>(null);
   const [hoveredTokenId, setHoveredTokenId] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [activePrompt, setActivePrompt] = useState<string | null>(null);
 
   const sessionIdRef = useRef<string | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -197,6 +198,7 @@ export default function Home() {
     setCurrentPhaseLabel("original");
     setSelectedTokenId(null);
     setErrorMsg(null);
+    setActivePrompt(mode === "scenario" ? (SCENARIOS[scenarioIdx]?.prompt ?? null) : promptInput.trim() || null);
     setPulsing(true);
     setPhase("running");
     requestAnimationFrame(() => {
@@ -566,6 +568,12 @@ export default function Home() {
 
         <div ref={stageRef} className={`${styles.stage} ${showStrip ? styles.stageEndState : ""}`}>
           <div ref={tokensColRef} className={styles.tokensCol}>
+            {activePrompt && (
+              <div className={styles.activePromptBox}>
+                <div className={styles.activePromptLabel}>prompt</div>
+                <div className={styles.activePromptText}>{activePrompt}</div>
+              </div>
+            )}
             <div className={styles.tokensList}>
               {tokens.map((tok) => {
                 if (tok.isSeparator) {
