@@ -364,42 +364,106 @@ class NLAClient:
 
         self.sglang_url = sglang_url.rstrip("/")
         self._http = httpx.Client(timeout=httpx.Timeout(120.0))
+        # AsyncClient lives alongside the sync one so generate_async() can
+        # drive overlapped HTTP I/O directly from an event loop without
+        # routing through asyncio.to_thread (which costs a worker thread per
+        # in-flight call and adds GIL contention with the main loop).
+        self._async_http = httpx.AsyncClient(timeout=httpx.Timeout(120.0))
+
+        # Cache the canonical prompt's token embeddings once. Only the
+        # injection slot changes per call; the chat template + tokenize +
+        # embed lookup + arch-scale are otherwise repeated work.
+        (
+            self._cached_embeds,
+            self._cached_inject_pos,
+            self._cached_prompt_len,
+        ) = self._precompute_canonical_prompt()
 
         print(
             f"[NLAClient] {checkpoint_dir.name}: d_model={self.cfg.d_model} "
             f"inj_scale={self.cfg.injection_scale} embed_scale={self.embed_scale:.2f} "
-            f"inj_char={self.cfg.injection_char!r}(id={self.cfg.injection_token_id})"
+            f"inj_char={self.cfg.injection_char!r}(id={self.cfg.injection_token_id}) "
+            f"prompt_len={self._cached_prompt_len} inject_pos={self._cached_inject_pos}"
         )
 
     # ─── Core inference step ──────────────────────────────────────────────
+
+    def _precompute_canonical_prompt(self) -> tuple[np.ndarray, int, int]:
+        """Tokenize + embed the sidecar's canonical actor prompt once.
+
+        The injection slot is left as the marker char's own embedding; each
+        per-call _build_embeds() copies this array and overwrites only that
+        slot. Returns (embeds[T, d] fp32 contiguous numpy, inject_pos, T).
+        """
+        content = self.cfg.actor_prompt_template.format(
+            injection_char=self.cfg.injection_char
+        )
+        input_ids = self.tokenizer.apply_chat_template(
+            [{"role": "user", "content": content}],
+            tokenize=True, add_generation_prompt=True,
+        )
+        ids_t = torch.tensor(input_ids, dtype=torch.long).unsqueeze(0)
+        with torch.no_grad():
+            embeds = (self.embed(ids_t.to(self.embed.weight.device))
+                      * self.embed_scale).float()
+
+        inj_id = self.cfg.injection_token_id
+        matches = [
+            i for i, t in enumerate(input_ids)
+            if t == inj_id
+            and 0 < i < len(input_ids) - 1
+            and input_ids[i - 1] == self.cfg.injection_left_neighbor_id
+            and input_ids[i + 1] == self.cfg.injection_right_neighbor_id
+        ]
+        assert len(matches) == 1, (
+            f"expected exactly one valid injection site in canonical prompt, "
+            f"got {len(matches)}. load_nla_config should have caught this."
+        )
+        return (
+            embeds[0].cpu().contiguous().numpy(),
+            matches[0],
+            len(input_ids),
+        )
 
     def _build_embeds(
         self, v_raw: torch.Tensor, prompt_content: str | None
     ) -> tuple[np.ndarray, int]:
         """Tokenize → embed → arch-scale → inject. Returns (embeds[T,d], prompt_len).
 
+        Fast path (prompt_content is None — the production path used by the
+        sidecar's canonical actor template): copies the cached prompt embedding
+        and overwrites only the injection slot. Saves chat template +
+        tokenize + embed lookup per call. Slow path stays for ad-hoc prompts
+        (debug, custom eval).
+
         prompt_content: user message content WITH <INJECT> placeholder. None
         uses the sidecar's canonical actor template (recommended — that's
         what the model was trained on).
         """
-        if prompt_content is None:
-            content = self.cfg.actor_prompt_template.format(
-                injection_char=self.cfg.injection_char
-            )
-        else:
-            assert INJECT_PLACEHOLDER in prompt_content, (
-                f"custom prompt must contain {INJECT_PLACEHOLDER!r}"
-            )
-            content = prompt_content.replace(
-                INJECT_PLACEHOLDER, self.cfg.injection_char
-            )
+        assert torch.isfinite(v_raw).all(), "activation has NaN/Inf"
+        v_scaled = normalize_activation(
+            v_raw.float().view(1, -1), self.cfg.injection_scale
+        )
 
-        # One-step tokenize. Handles BOS correctly for all architectures —
-        # Gemma's chat template includes <bos>, Qwen has none. The two-step
-        # apply_chat_template(tokenize=False)→encode(add_special_tokens=False)
+        if prompt_content is None:
+            # Copy so concurrent generate_async calls don't clobber each
+            # other's injection slot. ~80 × d_model × 4 bytes ≈ 1MB per call.
+            out = self._cached_embeds.copy()
+            out[self._cached_inject_pos] = v_scaled[0].numpy()
+            return out, self._cached_prompt_len
+
+        # Slow path: ad-hoc prompt. One-step tokenize handles BOS correctly
+        # for all architectures — Gemma's chat template includes <bos>, Qwen
+        # has none. apply_chat_template(tokenize=False)→encode(add_special_tokens=False)
         # is equivalent but add_special_tokens=True there would double-BOS
-        # Gemma (shifting every position by 1). Qwen has bos_token=None so
-        # it's a silent noop there, which makes this easy to miss.
+        # Gemma (shifting every position by 1).
+        assert INJECT_PLACEHOLDER in prompt_content, (
+            f"custom prompt must contain {INJECT_PLACEHOLDER!r}"
+        )
+        content = prompt_content.replace(
+            INJECT_PLACEHOLDER, self.cfg.injection_char
+        )
+
         input_ids = self.tokenizer.apply_chat_template(
             [{"role": "user", "content": content}],
             tokenize=True, add_generation_prompt=True,
@@ -411,11 +475,6 @@ class NLAClient:
             # embed_scale: 1.0 for Qwen/Llama, √d for Gemma-3.
             embeds = (self.embed(ids_t.to(self.embed.weight.device))
                       * self.embed_scale).float()
-
-        assert torch.isfinite(v_raw).all(), "activation has NaN/Inf"
-        v_scaled = normalize_activation(
-            v_raw.float().view(1, -1), self.cfg.injection_scale
-        )
 
         injected = inject_at_marked_positions(
             ids_t, embeds.cpu(), v_scaled,
@@ -507,11 +566,69 @@ class NLAClient:
         **sampling: object,
     ) -> list[str]:
         """Sequential requests. SGLang's continuous batcher packs on its end.
-        For real throughput, fire these in parallel via async httpx."""
+        For real throughput, fan out in parallel — asyncio.gather over
+        generate_async (defined below)."""
         return [self.generate(v, prompt=prompt,
                               extract_explanation=extract_explanation,
                               **sampling)
                 for v in activations]
+
+    # ─── Async siblings (for streaming + parallel fan-out) ───────────────
+
+    async def _sglang_generate_async(
+        self, embeds_np: np.ndarray, **sampling: object
+    ) -> dict[str, Any]:
+        """Same payload as _sglang_generate, AsyncClient transport. Lets the
+        event loop drive the HTTP I/O — no thread pool, no GIL contention."""
+        sp = {"temperature": 1.0, "max_new_tokens": 200,
+              "skip_special_tokens": False}
+        sp.update(sampling)
+        body = orjson.dumps(
+            {"input_embeds": embeds_np, "sampling_params": sp},
+            option=orjson.OPT_SERIALIZE_NUMPY,
+        )
+        resp = await self._async_http.post(
+            f"{self.sglang_url}/generate",
+            content=body, headers={"Content-Type": "application/json"},
+        )
+        resp.raise_for_status()
+        out = resp.json()
+        return out[0] if isinstance(out, list) else out
+
+    async def generate_async(
+        self,
+        activation: Iterable[float] | np.ndarray | torch.Tensor,
+        *,
+        prompt: str | None = None,
+        extract_explanation: bool = True,
+        **sampling: object,
+    ) -> str:
+        """Async sibling of generate(). Same semantics — same caching, same
+        parsing — but driven from the event loop. Use under asyncio.gather or
+        asyncio.create_task to overlap actor calls with each other and with
+        the caller's other async work (e.g. Qwen-base forwards in
+        gpu/streaming.py)."""
+        v = torch.as_tensor(np.asarray(activation, dtype=np.float32))
+        assert v.numel() == self.cfg.d_model, (
+            f"activation length {v.numel()} != d_model {self.cfg.d_model}"
+        )
+
+        embeds_np, _ = self._build_embeds(v, prompt)
+        out = await self._sglang_generate_async(embeds_np, **sampling)
+        text = out["text"]
+
+        if not extract_explanation:
+            return text
+        m = EXPLANATION_RE.search(text)
+        if m is None:
+            print(f"[NLAClient] WARNING: no <explanation> tags. "
+                  f"Raw[:200]={text[:200]!r}")
+            return text
+        return m.group(1).strip()
+
+    async def aclose(self) -> None:
+        """Close the AsyncClient. Call from the FastAPI lifespan on shutdown."""
+        await self._async_http.aclose()
 
 
 # ─── CRITIC (activation reconstructor) ───────────────────────────────────────

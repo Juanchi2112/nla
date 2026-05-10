@@ -78,6 +78,7 @@ async def lifespan(app: FastAPI):
     app.state.nla = State(extractor, actor, critic, asyncio.Lock())
     print(f"[server] ready. critic={'yes' if critic else 'no'}")
     yield
+    await actor.aclose()
 
 
 app = FastAPI(lifespan=lifespan, title="NLA")
@@ -160,12 +161,13 @@ async def decode(req: DecodeRequest) -> DecodeResponse:
 
         vectors = [hidden[pos].numpy().astype(np.float32) for pos in positions]
 
-        # Fan out actor calls. SGLang's continuous batcher packs them server-side;
-        # sequential httpx posts here would serialize end-to-end and miss that.
+        # Fan out actor calls via generate_async — AsyncClient handles the
+        # parallel HTTP fan-out directly on the event loop. SGLang's continuous
+        # batcher packs them server-side; sequential httpx posts here would
+        # serialize end-to-end and miss that.
         decodes = await asyncio.gather(
             *[
-                asyncio.to_thread(
-                    state.actor.generate,
+                state.actor.generate_async(
                     v,
                     temperature=req.temperature,
                     max_new_tokens=req.max_new_tokens,

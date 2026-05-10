@@ -209,12 +209,12 @@ async def stream_events(
         spawned_at = now()
         stats.actor_first_spawn = min(stats.actor_first_spawn, spawned_at)
         stats.actor_count += 1
-        # to_thread releases the GIL on the httpx socket read; create_task
-        # only schedules — the coroutine starts on the next loop yield (the
-        # asyncio.sleep(0) below). Without that yield we'd queue all tasks at
-        # the end and lose every overlap opportunity.
-        coro = asyncio.to_thread(
-            actor.generate,
+        # generate_async drives httpx.AsyncClient on the event loop directly —
+        # no worker thread, no GIL contention with the main loop's CPU work.
+        # create_task only schedules; the coroutine starts on the next loop
+        # yield (the asyncio.sleep(0) below). Without that yield we'd queue
+        # all tasks at the end and lose every overlap opportunity.
+        coro = actor.generate_async(
             v,
             temperature=config.actor_temperature,
             max_new_tokens=config.actor_max_new_tokens,
