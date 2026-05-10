@@ -14,6 +14,7 @@ import {
   type VerdictAction,
   type Severity,
 } from "@/lib/nlaApi";
+import FlowPanel from "@/components/FlowPanel";
 
 type Phase = "idle" | "running" | "done" | "error";
 type Mode = "scenario" | "free";
@@ -81,6 +82,7 @@ export default function Home() {
   const [steerStatus, setSteerStatus] = useState<"idle" | "started" | "rejected">("idle");
 
   const [selectedTokenId, setSelectedTokenId] = useState<number | null>(null);
+  const [hoveredTokenId, setHoveredTokenId] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const sessionIdRef = useRef<string | null>(null);
@@ -348,6 +350,7 @@ export default function Home() {
     setSteerStatus("idle");
     setCurrentPhaseLabel("original");
     setSelectedTokenId(null);
+    setHoveredTokenId(null);
     setErrorMsg(null);
     setPhase("idle");
   };
@@ -429,7 +432,14 @@ export default function Home() {
     [tokens, selectedTokenId]
   );
 
-  const selectedDivergence = selectedToken ? divergenceMap.get(selectedToken.id)?.d : undefined;
+  const hoveredToken = useMemo(
+    () => tokens.find((t) => t.id === hoveredTokenId) ?? null,
+    [tokens, hoveredTokenId]
+  );
+
+  const activeToken = hoveredToken ?? selectedToken;
+
+  const selectedDivergence = activeToken ? divergenceMap.get(activeToken.id)?.d : undefined;
   const showStrip = phase === "done" || phase === "error";
 
   const currentScenario = scenarioIdx < 3 ? SCENARIOS[scenarioIdx] : null;
@@ -534,39 +544,6 @@ export default function Home() {
           {currentScenario ? currentScenario.shortLabel : "Free input — escribí tu propio prompt"}
         </div>
 
-        <div className={styles.kpiStrip} aria-label="key product stats">
-          <div className={styles.kpiTile}>
-            <span className={styles.kpiNumber}>4</span>
-            <span className={styles.kpiLabel}>reglas auditadas</span>
-            <span className={styles.kpiSub}>
-              ai_disclosure · no_pii · financial_advice · sycophancy
-            </span>
-          </div>
-          <div className={styles.kpiTile}>
-            <span className={styles.kpiNumber}>
-              5–8<span className={styles.kpiUnit}>s</span>
-            </span>
-            <span className={styles.kpiLabel}>por verbalización</span>
-            <span className={styles.kpiSub}>Qwen-2.5-7B · NLA L20 · vast.ai A6000</span>
-          </div>
-          <div className={styles.kpiTile}>
-            <span className={styles.kpiNumber}>0</span>
-            <span className={styles.kpiLabel}>etiquetas</span>
-            <span className={styles.kpiSub}>zero-shot · sin fine-tune · residual stream</span>
-          </div>
-        </div>
-      </section>
-
-      <section className={`lyt-block lyt-tight lyt-align-left ${styles.differenceTira}`}>
-        <p className={styles.differenceTiraTitle}>
-          Todos los monitores que conocés están <em>afuera</em> del modelo.
-          <br />
-          <span className={styles.differenceTiraTitleAccent}>Verbalize está adentro.</span>
-        </p>
-        <p className={styles.differenceTiraSub}>
-          firewalls · output filters · CoT monitors · evals → todos black-box.
-          Nosotros leemos activaciones del residual stream.
-        </p>
       </section>
 
       <section className="lyt-block lyt-align-fullbleed lyt-dark lyt-tight">
@@ -662,29 +639,18 @@ export default function Home() {
                   ? "Elegí scenario con ← → y apretá Run."
                   : "Tipeá un prompt y mandá."}
               </div>
-            ) : !verdicts.original && !verdicts.steered ? (
-              <div className={styles.judgeWaiting}>
-                <span className={styles.outputLabel}>[NLA · juicio]</span>
-                <p className={styles.judgeWaitingText}>
-                  Esperando juicio del NLA
-                  <span className={styles.outputCaret} aria-hidden="true" />
-                </p>
-              </div>
             ) : (
-              <div className={styles.judgeStack}>
-                {verdicts.original && (
-                  <VerdictCard phase="original" verdict={verdicts.original} />
-                )}
-                {verdicts.steered && (
-                  <VerdictCard phase="steered" verdict={verdicts.steered} />
-                )}
-                {steerDelta && (
-                  <div className={styles.deltaBanner}>
-                    Steering improvement: trust {steerDelta.original} → {steerDelta.steered} (Δ +
-                    {steerDelta.delta})
-                  </div>
-                )}
-              </div>
+              <FlowPanel
+                original={verdicts.original}
+                steered={verdicts.steered}
+                steerDelta={steerDelta}
+                steerStatus={steerStatus}
+                phase={phase}
+                pendingSteer={pendingSteer}
+                onConfirm={handleConfirmSteer}
+                onReject={handleRejectSteer}
+                steerCountdown={steerCountdown}
+              />
             )}
           </div>
 
@@ -696,42 +662,65 @@ export default function Home() {
         <div className={styles.inspectionLayout}>
           <div className={styles.inspectionLeft}>
             <h2 className={styles.detailTitle}>Inspección por token</h2>
-            <div className={styles.bottomStrip}>
+            <p
+              className={styles.proseStream}
+              onMouseLeave={() => setHoveredTokenId(null)}
+            >
               {tokens
                 .filter((t) => !t.isSeparator)
-                .map((tok) => {
+                .map((tok, i) => {
                   const tier = tierOfToken(tok);
                   const selected = selectedTokenId === tok.id;
+                  const hovered = hoveredTokenId === tok.id;
                   const cls = [
-                    styles.stripChip,
-                    tier === "low" && styles.stripChipLow,
-                    tier === "warn" && styles.stripChipWarn,
-                    tier === "decep" && styles.stripChipDecep,
-                    selected && styles.stripChipSelected,
-                    tok.phaseLabel === "steered" && styles.stripChipSteered,
+                    styles.proseWord,
+                    tier === "low" && styles.proseWordLow,
+                    tier === "warn" && styles.proseWordWarn,
+                    tier === "decep" && styles.proseWordDecep,
+                    selected && styles.proseWordSelected,
+                    hovered && styles.proseWordHovered,
+                    tok.phaseLabel === "steered" && styles.proseWordSteered,
                   ]
                     .filter(Boolean)
                     .join(" ");
+                  const raw = tok.text;
+                  const display = raw.trim() || raw;
+                  const leadingSpace = i > 0 && /^\s/.test(raw);
                   return (
-                    <button
-                      key={tok.id}
-                      type="button"
-                      className={cls}
-                      onClick={() =>
-                        setSelectedTokenId((prev) => (prev === tok.id ? null : tok.id))
-                      }
-                    >
-                      {tok.text.trim() || tok.text}
-                    </button>
+                    <span key={tok.id}>
+                      {leadingSpace ? " " : ""}
+                      <span
+                        className={cls}
+                        tabIndex={0}
+                        onMouseEnter={() => setHoveredTokenId(tok.id)}
+                        onFocus={() => setHoveredTokenId(tok.id)}
+                        onBlur={() => setHoveredTokenId(null)}
+                        onClick={() =>
+                          setSelectedTokenId((prev) =>
+                            prev === tok.id ? null : tok.id
+                          )
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedTokenId((prev) =>
+                              prev === tok.id ? null : tok.id
+                            );
+                          }
+                        }}
+                      >
+                        {display}
+                      </span>
+                    </span>
                   );
                 })}
-            </div>
+            </p>
           </div>
 
           <div className={styles.bottomDetail}>
-          {!selectedToken ? (
+          {!activeToken ? (
             <div className={styles.detailEmpty}>
-              Click en un token para ver monologue + divergencia.
+              Pasá el cursor sobre una palabra para leer el monólogo interno. Click para fijar.
             </div>
           ) : (
             <div className={styles.detailCard}>
@@ -739,13 +728,13 @@ export default function Home() {
                 <div>
                   <span className={styles.judgeLabel}>Token</span>
                   <span className={styles.tokenChipBig}>
-                    &ldquo;{selectedToken.text}&rdquo;
+                    &ldquo;{activeToken.text}&rdquo;
                   </span>
                 </div>
                 <div>
                   <span className={styles.judgeLabel}>Fase</span>
                   <span className={styles.tokenChipBig}>
-                    {selectedToken.phaseLabel ?? "—"}
+                    {activeToken.phaseLabel ?? "—"}
                   </span>
                 </div>
                 {selectedDivergence && (
@@ -762,7 +751,7 @@ export default function Home() {
                 <div className={styles.monologueLabel}>Internal monologue</div>
                 <div className={styles.monologueText}>
                   &ldquo;
-                  {monologueByStep.get(selectedToken.id) ??
+                  {monologueByStep.get(activeToken.id) ??
                     selectedDivergence?.internal_thought ??
                     "—"}
                   &rdquo;
@@ -881,90 +870,40 @@ export default function Home() {
         </div>
       </section>
 
-      {pendingSteer && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalCard}>
-            <h3 className={styles.modalTitle}>Steering propuesto</h3>
-            <p className={styles.modalReason}>{pendingSteer.reason}</p>
-            <pre className={styles.modalCorrection}>{pendingSteer.correction_prompt}</pre>
-            <div className={styles.modalCountdown}>Timeout: {steerCountdown}s</div>
-            <div className={styles.modalActions}>
-              <button
-                type="button"
-                className={styles.btnPrimary}
-                onClick={handleConfirmSteer}
-              >
-                Confirmar
-              </button>
-              <button
-                type="button"
-                className={styles.btnGhost}
-                onClick={handleRejectSteer}
-              >
-                Rechazar
-              </button>
-            </div>
+      <section className={`lyt-block lyt-tight lyt-align-left ${styles.differenceTira}`}>
+        <p className={styles.differenceTiraTitle}>
+          Todos los monitores que conocés están <em>afuera</em> del modelo.
+          <br />
+          <span className={styles.differenceTiraTitleAccent}>Verbalize está adentro.</span>
+        </p>
+        <p className={styles.differenceTiraSub}>
+          firewalls · output filters · CoT monitors · evals → todos black-box.
+          Nosotros leemos activaciones del residual stream.
+        </p>
+        <div className={styles.kpiStrip} aria-label="key product stats">
+          <div className={styles.kpiTile}>
+            <span className={styles.kpiNumber}>4</span>
+            <span className={styles.kpiLabel}>reglas auditadas</span>
+            <span className={styles.kpiSub}>
+              ai_disclosure · no_pii · financial_advice · sycophancy
+            </span>
+          </div>
+          <div className={styles.kpiTile}>
+            <span className={styles.kpiNumber}>
+              5–8<span className={styles.kpiUnit}>s</span>
+            </span>
+            <span className={styles.kpiLabel}>por verbalización</span>
+            <span className={styles.kpiSub}>Qwen-2.5-7B · NLA L20 · vast.ai A6000</span>
+          </div>
+          <div className={styles.kpiTile}>
+            <span className={styles.kpiNumber}>0</span>
+            <span className={styles.kpiLabel}>etiquetas</span>
+            <span className={styles.kpiSub}>zero-shot · sin fine-tune · residual stream</span>
           </div>
         </div>
-      )}
+      </section>
+
     </main>
   );
 }
 
-function VerdictCard({
-  phase,
-  verdict,
-}: {
-  phase: "original" | "steered";
-  verdict: TurnVerdict;
-}) {
-  const color = colorForAction(verdict.action);
-  return (
-    <div className={styles.verdictCard}>
-      <div className={styles.verdictHeader}>
-        <span className={styles.verdictPhase}>{phase}</span>
-        <span className={styles.verdictAction} style={{ color, borderColor: color }}>
-          {verdict.action}
-        </span>
-        <span className={styles.verdictTrust}>
-          trust: <strong>{verdict.trust_score}</strong>/100
-        </span>
-      </div>
-      <p className={styles.verdictSummary}>{verdict.summary}</p>
-      {verdict.divergences.length > 0 && (
-        <div>
-          <div className={styles.verdictDivLabel}>
-            Divergencias ({verdict.divergences.length})
-          </div>
-          <ul className={styles.verdictDivList}>
-            {verdict.divergences.map((d, i) => (
-              <li key={i} className={styles.verdictDivItem} data-severity={d.severity}>
-                <div className={styles.divergenceCategory}>
-                  {d.category.replace(/_/g, " ")} · {d.severity}
-                </div>
-                <div className={styles.divergenceVerbal}>
-                  <strong>verbal:</strong> {d.verbal_claim}
-                </div>
-                <div className={styles.divergenceInternal}>
-                  <strong>interno:</strong> {d.internal_thought}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {verdict.correction_prompt && (
-        <details className={styles.verdictCorrection}>
-          <summary>Correction prompt</summary>
-          <pre>{verdict.correction_prompt}</pre>
-        </details>
-      )}
-      {verdict.reasoning && (
-        <details className={styles.verdictReasoning}>
-          <summary>Reasoning</summary>
-          <p>{verdict.reasoning}</p>
-        </details>
-      )}
-    </div>
-  );
-}

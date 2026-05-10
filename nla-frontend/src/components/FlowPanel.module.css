@@ -1,0 +1,435 @@
+.flowRoot {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+}
+
+/* ─ Spinner ─ */
+.spinner {
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─ Waiting ─ */
+.waitingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 16px;
+}
+
+.waitingText {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-secondary);
+  margin: 0;
+}
+
+/* ─ Output ─ */
+.outputSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.outputLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--fg-secondary);
+}
+
+.outputBox {
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font-serif);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fg);
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+/* ─ Divergences ─ */
+.divergencesSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.divergencesTitle {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-secondary);
+}
+
+.divergencesContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.divChip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.15);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.divChip[data-severity="high"] {
+  border-left-color: var(--diagram-red);
+  background: rgba(230, 107, 107, 0.08);
+}
+
+.divChip[data-severity="medium"] {
+  border-left-color: var(--diagram-gold);
+  background: rgba(224, 166, 86, 0.08);
+}
+
+.divChip[data-severity="low"] {
+  border-left-color: var(--fg-secondary);
+  background: rgba(136, 135, 132, 0.05);
+}
+
+.divCategory {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--fg-secondary);
+  font-weight: 600;
+}
+
+.divChip[data-severity="high"] .divCategory { color: var(--diagram-red); }
+.divChip[data-severity="medium"] .divCategory { color: var(--diagram-gold); }
+
+.divClaim {
+  color: var(--fg);
+  margin: 0;
+  font-weight: 500;
+}
+
+/* ─ INCUMPLIMIENTO BANNER ─ */
+.incumplimientoBanner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 24px 20px;
+  background: rgba(230, 107, 107, 0.18);
+  border: 2.5px solid var(--diagram-red);
+  border-radius: 8px;
+  text-align: center;
+  animation: bannerPulse 2s ease-in-out infinite;
+}
+
+@keyframes bannerPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(230, 107, 107, 0); }
+  50% { box-shadow: 0 0 0 6px rgba(230, 107, 107, 0.15); }
+}
+
+.incumplimientoTitle {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--diagram-red);
+  line-height: 1;
+}
+
+.incumplimientoSub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(230, 107, 107, 0.75);
+}
+
+/* ─ Connector arrow ─ */
+.connectorArrow {
+  text-align: center;
+  font-size: 24px;
+  color: var(--accent);
+  opacity: 0.6;
+  padding: 8px 0 4px;
+  line-height: 1;
+  animation: bounce 1.8s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+
+/* ─ Correction block (visible fixed during correcting/migrating/rerunning/final) ─ */
+.correctionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.judgeBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  background: rgba(224, 166, 86, 0.13);
+  border: 2px solid rgba(224, 166, 86, 0.45);
+  border-radius: 6px;
+  box-shadow: 0 0 24px rgba(224, 166, 86, 0.1);
+}
+
+.judgeHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.judgeLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--diagram-gold);
+  font-weight: 700;
+}
+
+.judgeCountdown {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-secondary);
+}
+
+.promptBox {
+  padding: 22px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1.5px solid rgba(224, 166, 86, 0.25);
+  border-radius: 4px;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.85;
+  color: var(--fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+  letter-spacing: 0.3px;
+}
+
+/* ─ Steer action buttons ─ */
+.steerActions {
+  display: flex;
+  gap: 10px;
+}
+
+.btnConfirm {
+  flex: 1;
+  padding: 10px 16px;
+  background: rgba(224, 166, 86, 0.2);
+  border: 1.5px solid var(--diagram-gold);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--diagram-gold);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btnConfirm:hover {
+  background: rgba(224, 166, 86, 0.3);
+}
+
+.btnReject {
+  padding: 10px 14px;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-secondary);
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.btnReject:hover {
+  border-color: var(--diagram-red);
+  color: var(--diagram-red);
+}
+
+/* ─ Migration section (aparece debajo del correction prompt) ─ */
+.migrationSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.migrationBox {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: rgba(224, 166, 86, 0.07);
+  border: 1px solid rgba(224, 166, 86, 0.25);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.migrationLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--diagram-gold);
+  font-weight: 700;
+}
+
+.tokensStream {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 34px;
+  overflow: hidden;
+}
+
+.migratingToken {
+  display: inline-block;
+  padding: 4px 8px;
+  background: rgba(224, 166, 86, 0.18);
+  border: 1px solid rgba(224, 166, 86, 0.38);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--diagram-gold);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ─ Loop block (aparece en migrating, permanece hasta final) ─ */
+.loopBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.loopIndicator {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.loopStatusRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.loopLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.spinnerDone {
+  border-top-color: var(--fg-secondary);
+  animation: none;
+  opacity: 0.4;
+}
+
+/* ─ Final ─ */
+.finalSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.resultBadge {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 14px;
+  border-radius: 6px;
+  text-align: center;
+  border: 2px solid;
+}
+
+.resultBadge[data-action="PASS"] {
+  background: rgba(127, 182, 128, 0.12);
+  border-color: var(--pass);
+}
+
+.resultBadge[data-action="FLAG"] {
+  background: rgba(224, 166, 86, 0.12);
+  border-color: var(--diagram-gold);
+}
+
+.resultBadge[data-action="STEER"] {
+  background: rgba(230, 107, 107, 0.12);
+  border-color: var(--diagram-red);
+}
+
+.resultAction {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.resultBadge[data-action="PASS"] .resultAction { color: var(--pass); }
+.resultBadge[data-action="FLAG"] .resultAction { color: var(--diagram-gold); }
+.resultBadge[data-action="STEER"] .resultAction { color: var(--diagram-red); }
+
+.resultTrust {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-secondary);
+}
+
+.resultDelta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg);
+  font-weight: 600;
+}
