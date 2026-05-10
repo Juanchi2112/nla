@@ -35,7 +35,6 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from gpu.nla_inference import NLAClient
 
-
 EventKind = Literal["token", "actor_spawn", "nla_trace", "summary"]
 
 
@@ -184,9 +183,7 @@ async def stream_events(
     tokenizer = extractor.tokenizer
 
     if config.raw:
-        ids = tokenizer(
-            prompt, return_tensors="pt", add_special_tokens=True
-        )["input_ids"]
+        ids = tokenizer(prompt, return_tensors="pt", add_special_tokens=True)["input_ids"]
     else:
         ids = tokenizer.apply_chat_template(
             [{"role": "user", "content": prompt}],
@@ -230,7 +227,7 @@ async def stream_events(
         nonlocal prev_text
         all_ids.append(next_id)
         cur_text = tokenizer.decode(all_ids, skip_special_tokens=False)
-        chunk = cur_text[len(prev_text):]
+        chunk = cur_text[len(prev_text) :]
         prev_text = cur_text
         return StreamEvent(kind="token", t=now(), step=step, text=chunk)
 
@@ -245,9 +242,7 @@ async def stream_events(
                 done_at = now()
                 stats.actor_total_latency += done_at - at.spawned_at
                 stats.actor_last_done = max(stats.actor_last_done, done_at)
-                events.append(
-                    StreamEvent(kind="nla_trace", t=done_at, step=at.step, text=text)
-                )
+                events.append(StreamEvent(kind="nla_trace", t=done_at, step=at.step, text=text))
                 pending.remove(at)
         return events
 
@@ -297,13 +292,9 @@ async def stream_events(
         # Summary.
         wallclock = now()
         actor_window = (
-            stats.actor_last_done - stats.actor_first_spawn
-            if stats.actor_count > 0
-            else 0.0
+            stats.actor_last_done - stats.actor_first_spawn if stats.actor_count > 0 else 0.0
         )
-        overlap = (
-            stats.actor_total_latency / actor_window if actor_window > 0 else 0.0
-        )
+        overlap = stats.actor_total_latency / actor_window if actor_window > 0 else 0.0
         summary = {
             "tokens": stats.tokens,
             "wallclock_s": round(wallclock, 3),

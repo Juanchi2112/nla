@@ -1,33 +1,22 @@
-"""Compliance judges + risk rubrics for NLA monitoring.
+"""Unified judge layer.
 
-Imported by `backend.judge_runner` to evaluate AV-decoded monologues
-in-process. No HTTP layer here — the former `judge_service/` deploy was
-folded into `backend/` as part of the monolith refactor.
+A single class `ClaudeAgentJudge` is the source of truth for all judge
+calls in the stack. It receives a complete turn (verbal + decoded rows)
+and returns a structured verdict (trust score, divergences, action,
+correction_prompt). Same class is invoked from both:
+  - scripts/precompute_verdicts.py (offline, baked into scenario artifacts)
+  - backend/steering_engine.py (live, when a custom prompt arrives)
 
-Steering pipelines live on a separate branch (feat/steering-loop) and
-ship their own copy of these modules (extended with s_target/AR
-plumbing). This package is the monitoring-only slice: text in,
-structured verdict out, no activations.
+The legacy per-monologue judges (`RegexJudge`, `ClaudeJudge`,
+`MultiTokenJudge`) and the rule-engine rubrics module were removed
+during the unified-judge refactor; their concept lives on as the
+`DivergenceCategory` Literal in `schemas.py`, used as a tag on
+divergences rather than as a separate dispatch layer.
 """
 
-from .judge import (
-    FLAG_THRESHOLD,
-    ClaudeJudge,
-    Judge,
-    JudgeResult,
-    MultiTokenJudge,
-    RegexJudge,
-)
-from .rubrics import RUBRICS, Rubric, rubrics_for_mode
+from .claude_agent_judge import ClaudeAgentJudge, ClaudeAgentJudgeError
 
 __all__ = [
-    "ClaudeJudge",
-    "FLAG_THRESHOLD",
-    "Judge",
-    "JudgeResult",
-    "MultiTokenJudge",
-    "RUBRICS",
-    "RegexJudge",
-    "Rubric",
-    "rubrics_for_mode",
+    "ClaudeAgentJudge",
+    "ClaudeAgentJudgeError",
 ]

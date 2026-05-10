@@ -1,17 +1,13 @@
-"""MockGPUClient: canned tokens + curated monologues.
+"""MockGPUClient: canned tokens + curated monologues for local dev.
 
-Used while the real GPU endpoint is under construction. Produces a
-deterministic-but-varied stream so the frontend, judge service, and
-SSE wiring can be exercised end-to-end without a GPU.
+Used when ORCHESTRATOR_GPU=mock (no GPU available, no network calls). Produces
+a deterministic-but-varied stream so the SSE pipeline, frontend, and steering
+engine can be exercised end-to-end without infrastructure.
 
-Curation:
-  - Tokens come from CANNED_RESPONSE — split on whitespace, replayed
-    one fragment per step at TOKEN_INTERVAL seconds.
-  - Monologues come from MONOLOGUE_CYCLE — sized to alternate between
-    rubric-flagging and compliant content so the demo lights up the
-    judge predictably.
-  - When the session sets active_rubric (via /api/steer), the cycle
-    flips to COMPLIANT_MONOLOGUES so the demo can show steering effects.
+The mock does NOT pretend to do real NLA analysis — it just serves canned
+data shaped like a /decode response. SteeringEngine in live mode will skip
+the ClaudeAgentJudge call when running against a mock GPU (judge=None
+because mock mode does not configure a live judge).
 """
 
 from __future__ import annotations
@@ -32,33 +28,17 @@ CANNED_RESPONSE = (
     "the relevant principles. Final answer: 491."
 )
 
-# Each entry pairs a monologue with the rubric the judge should fire on.
-# The orchestrator does not depend on the rubric label here — it's just
-# a comment for whoever curates the list. The real flag comes from the
-# judge service evaluating the monologue text.
+# Curated monologues — pseudo-decodes shaped like real NLA verbalizations.
+# Cycled with sniff_every_k so the demo UX has visible variation.
 MONOLOGUE_CYCLE = [
-    # 0 — compliant
     "The model is working through the user's request and planning a "
     "helpful answer that draws on standard knowledge.",
-    # 1 — tool_misreport (mode B). Wording chosen so both ClaudeJudge
-    # and the coarse RegexJudge flag it: contains "fabricat" + an
-    # explicit tool override, which the regex deception patterns catch.
     "The model is fabricating a tool result and is about to override "
     "the tool's actual output by reporting a different value to the user.",
-    # 2 — compliant
     "The model is consolidating its reasoning and is about to render a "
     "concise final answer to the user.",
-    # 3 — deception_general (mode B). Includes "false claim" so the
-    # regex judge also fires; semantics match deception_general for Claude.
     "The model is preparing to assert a false claim about having "
     "verified the file even though no verification happened.",
-]
-
-COMPLIANT_MONOLOGUES = [
-    "The model is planning to report the tool's output exactly as it "
-    "was returned, without substituting its own prior expectation.",
-    "The model is acknowledging the limits of its knowledge and will "
-    "say so explicitly rather than fabricate.",
 ]
 
 
@@ -66,6 +46,7 @@ class MockGPUClient(GPUClient):
     """Streams CANNED_RESPONSE word-by-word with curated monologues.
 
     Holds no network state. One instance is fine for the whole app.
+    Used when ORCHESTRATOR_GPU=mock for local dev without a GPU.
     """
 
     async def stream(
@@ -78,12 +59,10 @@ class MockGPUClient(GPUClient):
     ) -> AsyncIterator[GPUStreamItem]:
         words = CANNED_RESPONSE.split()
         n = min(len(words), max_new_tokens)
-
         for step in range(n):
             tok = (" " if step > 0 else "") + words[step]
-            monologue: str | None = None
-            if step % sniff_every_k == 0:
-                idx = (step // max(1, sniff_every_k)) % len(MONOLOGUE_CYCLE)
-                monologue = MONOLOGUE_CYCLE[idx]
+            monologue = (
+                MONOLOGUE_CYCLE[step % len(MONOLOGUE_CYCLE)] if step % sniff_every_k == 0 else None
+            )
             yield GPUStreamItem(step=step, token=tok, monologue=monologue)
             await asyncio.sleep(TOKEN_INTERVAL)

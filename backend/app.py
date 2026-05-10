@@ -1,30 +1,39 @@
-"""FastAPI backend for NLA monitoring (orchestrator + judge in-process).
+"""FastAPI backend for NLA monitoring.
 
-The judge logic that used to live in a separate `judge_service/` runs here
-directly via `backend.judge_runner.JudgeRunner` — no inter-service HTTP hop.
-The GPU /decode endpoint (vast.ai) is the only upstream dependency now.
+Single producer flow: every /api/generate request — whether it provides a
+custom `prompt` (live mode) or a `scenario_id` (cached demo) — is handled by
+the SteeringEngine, which dispatches internally to either:
 
-Default GPU backend is the local mock generator: produces canned tokens and
-curated monologues at a realistic pace so the rest of the stack
-(frontend, SSE, judge) can be exercised without a GPU.
+  - `_run_scenario`: replay a cached ScenarioArtifact (zero LLM calls at
+    runtime; verdict was pre-computed offline by precompute_verdicts.py).
+  - `_run_live`: call gpu.decode_full(), then ClaudeAgentJudge.evaluate_turn(),
+    then optionally manual-confirm a steering re-decode.
+
+There is one judge class in the system: ClaudeAgentJudge. It is instantiated
+lazily — only when ORCHESTRATOR_GPU=decoder, because that's the mode where
+live judging happens. Scenario mode does not need an Anthropic API key at
+runtime.
 
 Endpoints:
-    POST /api/generate          — start a generation session
-    GET  /api/stream/{id}       — SSE stream of token + nla_trace events
-    POST /api/steer             — set the session's active rubric
-    POST /api/cancel/{id}       — request stop
-    GET  /healthz               — liveness + config snapshot
+    POST /api/generate                         start a session (prompt XOR scenario_id)
+    GET  /api/stream/{id}                      SSE stream of all events
+    POST /api/cancel/{id}                      cooperative cancel
+    POST /api/confirm-steer/{id}               accept a proposed steering (live mode only)
+    POST /api/reject-steer/{id}                reject a proposed steering (live mode only)
+    GET  /healthz                              liveness + config snapshot
 
-Env (all optional except where noted):
+Env:
     PORT                  set by Railway
     CORS_ORIGINS          "*" (default; comma-separated)
-    JUDGE_BACKEND         "regex" (default) | "claude"
-    JUDGE_MODEL           "claude-haiku-4-5" (only used when backend=claude)
-    ANTHROPIC_API_KEY     required when JUDGE_BACKEND=claude
-    ORCHESTRATOR_GPU      "mock" (default) | "decoder"
+    ORCHESTRATOR_GPU      "scenario" | "decoder" | "mock"
     GPU_URL               required when ORCHESTRATOR_GPU=decoder
     GPU_TIMEOUT           "120.0" seconds
     MAX_NEW_TOKENS        "128"
+    SCENARIO_DIR          "./demo_data" (used when ORCHESTRATOR_GPU=scenario)
+    SCENARIO_MANIFEST     "manifest.yaml"
+    JUDGE_MODEL           "claude-sonnet-4-6" (live judge model when decoder mode)
+    JUDGE_PROMPT_VERSION  "v2-2026-05-10" (system prompt version for live judge)
+    ANTHROPIC_API_KEY     required for live judge (decoder mode)
 """
 
 from __future__ import annotations
@@ -34,8 +43,10 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -47,21 +58,23 @@ from .gpu import (
     GPUNotConfiguredError,
 )
 from .gpu.decoder_endpoint import URL_PLACEHOLDER
-from .judge_runner import JudgeRunner
-from .mock_generator import COMPLIANT_MONOLOGUES, MockGPUClient
+from .gpu.scenario import ArtifactLoader, ScenarioGPUClient
+from .judge.claude_agent_judge import ClaudeAgentJudge
+from .mock_generator import MockGPUClient
 from .schemas import (
     CancelResponse,
-    DoneEvent,
-    ErrorEvent,
     GenerateRequest,
     GenerateResponse,
-    NLATraceEvent,
-    SteerAppliedEvent,
-    SteerRequest,
-    SteerResponse,
-    TokenEvent,
+    SteeringDecisionResponse,
 )
 from .sessions import SessionRegistry, SessionState
+from .steering_engine import SteeringEngine
+
+# Load .env from the repo root (or any parent of cwd) BEFORE reading any
+# module-level os.environ values below. In Railway/Vercel/Docker there is no
+# .env file and this is a no-op; platform-injected env vars take precedence
+# (load_dotenv does not override existing keys by default).
+load_dotenv()
 
 log = logging.getLogger("backend")
 logging.basicConfig(level=logging.INFO)
@@ -69,61 +82,111 @@ logging.basicConfig(level=logging.INFO)
 
 # ─── Config ───────────────────────────────────────────────────────────────
 
-JUDGE_BACKEND = os.environ.get("JUDGE_BACKEND", "regex").lower()
-JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "claude-haiku-4-5")
-ORCH_GPU = os.environ.get("ORCHESTRATOR_GPU", "mock").lower()
+ORCH_GPU = os.environ.get("ORCHESTRATOR_GPU", "scenario").lower()
 GPU_URL = os.environ.get("GPU_URL", URL_PLACEHOLDER)
 GPU_TIMEOUT = float(os.environ.get("GPU_TIMEOUT", "120.0"))
 MAX_NEW_TOKENS = int(os.environ.get("MAX_NEW_TOKENS", "128"))
+SCENARIO_DIR = os.environ.get("SCENARIO_DIR", "./demo_data")
+SCENARIO_MANIFEST = os.environ.get("SCENARIO_MANIFEST", "manifest.yaml")
+JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "claude-sonnet-4-6")
+JUDGE_PROMPT_VERSION = os.environ.get("JUDGE_PROMPT_VERSION", "v2-2026-05-10")
 
 
-def _build_gpu_client() -> GPUClient:
+def _build_gpu_client() -> tuple[GPUClient, ArtifactLoader | None]:
+    """Build the GPU client and (when applicable) the cached-scenario loader."""
     if ORCH_GPU == "mock":
-        return MockGPUClient()
+        return MockGPUClient(), None
     if ORCH_GPU == "decoder":
         # Raises GPUNotConfiguredError if GPU_URL is the placeholder.
-        return DecoderEndpointClient(GPU_URL, timeout=GPU_TIMEOUT)
-    raise ValueError(f"unknown ORCHESTRATOR_GPU={ORCH_GPU!r}; expected 'mock' or 'decoder'")
+        # The /generate SSE endpoint does not take skip_first; that
+        # parameter belonged to the old /decode replay client.
+        return DecoderEndpointClient(GPU_URL, timeout=GPU_TIMEOUT), None
+    if ORCH_GPU == "scenario":
+        manifest_path = Path(SCENARIO_DIR) / SCENARIO_MANIFEST
+        loader = ArtifactLoader(manifest_path)
+        return ScenarioGPUClient(loader), loader
+    raise ValueError(
+        f"unknown ORCHESTRATOR_GPU={ORCH_GPU!r}; expected 'mock', 'decoder', or 'scenario'"
+    )
+
+
+def _build_live_judge() -> ClaudeAgentJudge | None:
+    """Instantiate ClaudeAgentJudge for live mode. Returns None if unavailable
+    (no API key, missing system prompt). Live mode without a judge surfaces an
+    error per request rather than failing the whole boot."""
+    if ORCH_GPU != "decoder":
+        return None  # scenario uses cached verdicts; mock is dev-only
+
+    sys_prompt_path = Path(SCENARIO_DIR) / "_system_prompts" / f"{JUDGE_PROMPT_VERSION}.txt"
+    if not sys_prompt_path.exists():
+        log.warning("Live judge unavailable: system prompt %s missing", sys_prompt_path)
+        return None
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        log.warning("Live judge unavailable: ANTHROPIC_API_KEY not set")
+        return None
+    try:
+        return ClaudeAgentJudge(
+            system_prompt=sys_prompt_path.read_text(),
+            system_prompt_version=JUDGE_PROMPT_VERSION,
+            model=JUDGE_MODEL,
+        )
+    except Exception as e:  # noqa: BLE001 — boot must not crash on judge issues
+        log.warning("Live judge unavailable: %s", e)
+        return None
 
 
 # ─── Lifespan ─────────────────────────────────────────────────────────────
 
 
 class AppState:
-    judge: JudgeRunner
     gpu: GPUClient
     sessions: SessionRegistry
+    artifact_loader: ArtifactLoader | None
+    judge: ClaudeAgentJudge | None
+    steering: SteeringEngine
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     state = AppState()
     state.sessions = SessionRegistry()
-    state.judge = JudgeRunner(backend=JUDGE_BACKEND, model=JUDGE_MODEL)
-    await state.judge.start()
-    state.gpu = _build_gpu_client()
-    app.state.orch = state
-    log.info(
-        "backend ready — gpu=%s judge=%s",
-        ORCH_GPU,
-        JUDGE_BACKEND,
+    state.gpu, state.artifact_loader = _build_gpu_client()
+    state.judge = _build_live_judge()
+    state.steering = SteeringEngine(
+        gpu=state.gpu,
+        artifact_loader=state.artifact_loader,
+        judge=state.judge,
     )
+
+    if state.artifact_loader is not None:
+        log.info(
+            "scenario mode — %d scenarios available: %s",
+            len(state.artifact_loader.scenarios),
+            state.artifact_loader.scenarios,
+        )
+    log.info(
+        "backend ready — gpu=%s live_judge=%s",
+        ORCH_GPU,
+        "active" if state.judge is not None else "inactive",
+    )
+
+    app.state.orch = state
     try:
         yield
     finally:
         await state.sessions.shutdown()
-        await state.judge.stop()
         await state.gpu.aclose()
 
 
 app = FastAPI(
     title="NLA Backend",
     description=(
-        "Orchestrator + in-process judge for NLA monitoring. Streams tokens "
-        "and judge verdicts over SSE; talks to a remote GPU /decode endpoint "
-        "for real activations (or a local mock for dev)."
+        "Orchestrator for NLA monitoring with a unified ClaudeAgentJudge. "
+        "One protocol covers cached demo scenarios and live custom prompts; "
+        "the SteeringEngine decides per request whether the source is "
+        "cached or live."
     ),
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -137,7 +200,6 @@ app.add_middleware(
 )
 
 
-# Translate GPU configuration errors into 503s with a clear body.
 @app.exception_handler(GPUNotConfiguredError)
 async def _gpu_not_configured(request: Request, exc):
     return JSONResponse(status_code=503, content={"detail": str(exc)})
@@ -161,109 +223,10 @@ def _sse_format(event: str, data: dict[str, Any]) -> bytes:
     return f"event: {event}\ndata: {payload}\n\n".encode()
 
 
-# ─── Generation task ──────────────────────────────────────────────────────
-
-
 async def _produce(state: AppState, session: SessionState) -> None:
-    """Async producer: drives the GPU client, talks to the judge,
-    and pushes structured events into the session's queue.
-
-    Cancellation is cooperative: we check session.stop_requested between
-    items. A direct asyncio.CancelledError (from app shutdown) is also
-    honoured — we emit a final cancelled `done` event, then return.
-    """
-    queue = session.queue
-    judge = state.judge
-    gpu = state.gpu
-    K = session.sniff_every_k  # noqa: N806 — uppercase matches paper notation
-    total = 0
-    reason = "completed"
-
-    try:
-        async for item in gpu.stream(
-            session.prompt,
-            system_prompt=session.system_prompt,
-            sniff_every_k=K,
-            max_new_tokens=MAX_NEW_TOKENS,
-        ):
-            if session.stop_requested:
-                reason = "cancelled"
-                break
-
-            # Emit any pending steer ack at the next item we see — could be
-            # token-only, monologue-only, or both. The step number tells the
-            # frontend where the steer took effect.
-            if session.update_pending and session.active_rubric:
-                await queue.put(
-                    (
-                        "steer_applied",
-                        SteerAppliedEvent(
-                            step=item.step,
-                            rubric=session.active_rubric,
-                            intensity=session.steer_intensity,
-                        ).model_dump(),
-                    )
-                )
-                session.update_pending = False
-
-            # Token and monologue arrive independently from real-streaming GPUs
-            # (gpu/server.py /generate). Either or both may be present per item.
-            if item.token is not None:
-                await queue.put(
-                    (
-                        "token",
-                        TokenEvent(
-                            step=item.step,
-                            text=item.token,
-                        ).model_dump(),
-                    )
-                )
-                total += 1
-
-            if item.monologue is not None:
-                # When the session is steered, override the canned monologue
-                # with a compliant one so the demo shows the judge going
-                # green. Real steering lands in a follow-up PR.
-                monologue = item.monologue
-                if session.active_rubric:
-                    monologue = COMPLIANT_MONOLOGUES[item.step % len(COMPLIANT_MONOLOGUES)]
-                # First sniff = mode A (intent-at-prompt), the rest = mode B.
-                mode = "A" if item.step < K else "B"
-                verdict = await judge.judge(monologue, mode)
-                await queue.put(
-                    (
-                        "nla_trace",
-                        NLATraceEvent(
-                            step=item.step,
-                            mode=mode,
-                            monologue=monologue,
-                            verdict=verdict,
-                        ).model_dump(),
-                    )
-                )
-
-        session.total_tokens_emitted = total
-
-    except asyncio.CancelledError:
-        reason = "cancelled"
-        raise
-    except GPUClientError as e:
-        await queue.put(("error", ErrorEvent(detail=str(e)).model_dump()))
-        reason = "completed"  # we still close the stream cleanly
-    except Exception as e:
-        log.exception("generator crashed for session=%s", session.session_id)
-        await queue.put(("error", ErrorEvent(detail=f"internal: {e}").model_dump()))
-        reason = "completed"
-    finally:
-        await queue.put(
-            (
-                "done",
-                DoneEvent(
-                    total_tokens=total,
-                    reason=reason,
-                ).model_dump(),
-            )
-        )
+    """Single entry into the SteeringEngine. Cooperative cancellation +
+    terminal `done` event are owned by the engine itself."""
+    await state.steering.run(session)
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────
@@ -272,15 +235,19 @@ async def _produce(state: AppState, session: SessionState) -> None:
 @app.get("/healthz")
 async def healthz(request: Request) -> dict[str, Any]:
     state = _state(request)
-    return {
+    payload: dict[str, Any] = {
         "status": "ok",
         "gpu_backend": ORCH_GPU,
         "gpu_url_set": GPU_URL != URL_PLACEHOLDER,
         "gpu_url": GPU_URL if GPU_URL != URL_PLACEHOLDER else None,
-        "judge_backend": state.judge.backend,
-        "judge_model": state.judge.model,
+        "judge_active": state.judge is not None,
+        "judge_model": state.judge.model if state.judge is not None else None,
+        "judge_prompt_version": JUDGE_PROMPT_VERSION,
         "max_new_tokens": MAX_NEW_TOKENS,
     }
+    if state.artifact_loader is not None:
+        payload["available_scenarios"] = state.artifact_loader.scenarios
+    return payload
 
 
 @app.post("/api/generate", response_model=GenerateResponse, status_code=202)
@@ -288,10 +255,25 @@ async def api_generate(req: GenerateRequest, request: Request) -> GenerateRespon
     state = _state(request)
     if state.sessions.get(req.session_id) is not None:
         raise HTTPException(409, f"session_id={req.session_id!r} already exists")
+
+    if req.scenario_id is not None:
+        if state.artifact_loader is None:
+            raise HTTPException(
+                503,
+                "Backend is not in scenario mode. Set ORCHESTRATOR_GPU=scenario to enable.",
+            )
+        if req.scenario_id not in state.artifact_loader.scenarios:
+            raise HTTPException(
+                404,
+                f"scenario_id={req.scenario_id!r} not found. "
+                f"Available: {state.artifact_loader.scenarios}",
+            )
+
     session = state.sessions.create(
         req.session_id,
-        req.prompt,
-        req.sniff_every_k,
+        prompt=req.prompt or "",
+        sniff_every_k=req.sniff_every_k,
+        scenario_id=req.scenario_id,
         system_prompt=req.system_prompt,
     )
     session.task = asyncio.create_task(_produce(state, session))
@@ -306,19 +288,12 @@ async def api_stream(session_id: str, request: Request) -> StreamingResponse:
         raise HTTPException(404, f"session_id={session_id!r} not found")
 
     async def event_source():
-        # Drain the queue until we see a `done` event. Honor client
-        # disconnects via Starlette's request.is_disconnected.
         while True:
             if await request.is_disconnected():
                 break
             try:
-                event_name, data = await asyncio.wait_for(
-                    session.queue.get(),
-                    timeout=15.0,
-                )
+                event_name, data = await asyncio.wait_for(session.queue.get(), timeout=15.0)
             except TimeoutError:
-                # Periodic comment frame keeps proxies + browsers from
-                # closing the connection during long waits.
                 yield b": keepalive\n\n"
                 continue
 
@@ -326,23 +301,9 @@ async def api_stream(session_id: str, request: Request) -> StreamingResponse:
             if event_name == "done":
                 break
 
-        # Drop session once the stream closes (caller is gone, or done).
         state.sessions.delete(session_id)
 
     return StreamingResponse(event_source(), media_type="text/event-stream")
-
-
-@app.post("/api/steer", response_model=SteerResponse)
-async def api_steer(req: SteerRequest, request: Request) -> SteerResponse:
-    state = _state(request)
-    ok = state.sessions.request_steer(req.session_id, req.rubric, req.intensity)
-    if not ok:
-        raise HTTPException(404, f"session_id={req.session_id!r} not found")
-    return SteerResponse(
-        session_id=req.session_id,
-        active_rubric=req.rubric,
-        intensity=req.intensity,
-    )
 
 
 @app.post("/api/cancel/{session_id}", response_model=CancelResponse)
@@ -352,3 +313,25 @@ async def api_cancel(session_id: str, request: Request) -> CancelResponse:
     if not ok:
         raise HTTPException(404, f"session_id={session_id!r} not found")
     return CancelResponse(session_id=session_id, stopped=True)
+
+
+@app.post("/api/confirm-steer/{session_id}", response_model=SteeringDecisionResponse)
+async def api_confirm_steer(session_id: str, request: Request) -> SteeringDecisionResponse:
+    state = _state(request)
+    session = state.sessions.get(session_id)
+    if session is None:
+        raise HTTPException(404, f"session_id={session_id!r} not found")
+    if not state.sessions.request_confirm_steer(session_id):
+        raise HTTPException(409, "session is not awaiting a steering decision")
+    return SteeringDecisionResponse(session_id=session_id, decision="confirm")
+
+
+@app.post("/api/reject-steer/{session_id}", response_model=SteeringDecisionResponse)
+async def api_reject_steer(session_id: str, request: Request) -> SteeringDecisionResponse:
+    state = _state(request)
+    session = state.sessions.get(session_id)
+    if session is None:
+        raise HTTPException(404, f"session_id={session_id!r} not found")
+    if not state.sessions.request_reject_steer(session_id):
+        raise HTTPException(409, "session is not awaiting a steering decision")
+    return SteeringDecisionResponse(session_id=session_id, decision="reject")
