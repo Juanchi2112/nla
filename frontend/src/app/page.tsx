@@ -469,9 +469,8 @@ export default function Home() {
           Lo que el modelo dice <span className={styles.headlineAccent}>vs.</span> lo que está pensando.
         </h1>
         <p className={styles.heroLead}>
-          Auditoría de alineamiento para LLMs open-source. Leemos el{" "}
-          <em>residual stream</em>{" "}del modelo &mdash; no la cadena de pensamiento que escribe sabiendo
-          que la van a leer.
+          Toda la AI safety actual lee lo que el modelo decidió mostrar.{" "}
+          <em>Verbalize lee lo que no pudo ocultar.</em>
         </p>
 
         <div className={styles.scenarioCarousel}>
