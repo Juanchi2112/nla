@@ -135,6 +135,18 @@
   font-weight: 500;
 }
 
+.divergenceExplanation {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(136, 135, 132, 0.06);
+  border-left: 2px solid var(--fg-secondary);
+  border-radius: 2px;
+  font-family: var(--font-serif);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fg-secondary);
+}
+
 /* ─ INCUMPLIMIENTO BANNER ─ */
 .incumplimientoBanner {
   display: flex;

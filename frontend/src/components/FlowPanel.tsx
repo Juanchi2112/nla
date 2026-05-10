@@ -191,6 +191,27 @@ export default function FlowPanel({
               <DivergenceChip key={idx} divergence={div} />
             ))}
           </motion.div>
+          {/* Explanatory message based on max severity */}
+          {original.divergences.length > 0 && (
+            <motion.div
+              className={styles.divergenceExplanation}
+              initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+            >
+              {(() => {
+                const maxSev = original.divergences.reduce((max, d) => {
+                  const sevOrder = { high: 3, medium: 2, low: 1 };
+                  return Math.max(max, sevOrder[d.severity] ?? 0);
+                }, 0);
+
+                if (maxSev === 3) return null; // No message for high severity
+                if (maxSev === 2) {
+                  return "Desviación detectada pero sin necesidad de intervención. El modelo divergió levemente de las reglas pero la salida es manejable.";
+                }
+                return "El modelo está básicamente alineado con las reglas.";
+              })()}
+            </motion.div>
+          )}
         </motion.div>
       )}
 
