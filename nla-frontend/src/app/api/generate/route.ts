@@ -41,14 +41,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     session_id: body.session_id,
-    ...(body.prompt ? { prompt: body.prompt } : {}),
-    ...(body.scenario_id ? { scenario_id: body.scenario_id } : {}),
-    system_prompt: body.system_prompt ?? null,
     sniff_every_k: body.sniff_every_k ?? 4,
-    ...(body.model ? { model: body.model } : {}),
   };
+  if (body.scenario_id) {
+    payload.scenario_id = body.scenario_id;
+  } else {
+    payload.prompt = body.prompt;
+    if (body.system_prompt !== undefined) payload.system_prompt = body.system_prompt;
+  }
+  if (body.model) payload.model = body.model;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
