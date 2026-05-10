@@ -145,23 +145,19 @@ export default function ComoFuncionaHero() {
     setT(() => setShowCaption(true), scanEnd + 600);
     setT(() => setActiveIdx(null), scanEnd + 1100);
     setT(() => setClimax(false), scanEnd + 1600);
-    setT(() => setFading(true), scanEnd + 3600);
-    setT(() => runCycle(), scanEnd + 4600);
   };
 
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
-    let running = false;
+    let started = false;
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && !running) {
-            running = true;
+          if (entry.isIntersecting && !started) {
+            started = true;
             runCycle();
-          } else if (!entry.isIntersecting && running) {
-            running = false;
-            clearAll();
+            observer.disconnect();
           }
         });
       },

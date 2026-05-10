@@ -88,6 +88,17 @@
   padding: 0 40px;
 }
 
+:global(#block-4) .blockTitle {
+  padding-left: 96px;
+}
+:global(#block-4)::before {
+  left: 96px !important;
+}
+@media (max-width: 899px) {
+  :global(#block-4) .blockTitle { padding-left: 56px; }
+  :global(#block-4)::before { left: 56px !important; }
+}
+
 /* Hide inline number when block uses numAsBg watermark (data-num present) */
 [data-num] > .blockNumber { display: none; }
 
