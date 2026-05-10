@@ -261,6 +261,12 @@ async def stream_events(
         await asyncio.sleep(0)
         for done_ev in collect_done():
             yield done_ev
+            # Force a loop iteration after each event so the SSE chunk
+            # actually flushes to the socket before the next one is queued
+            # — without this, several nla_trace events that complete in the
+            # same selector poll get yielded back-to-back into the same
+            # transport batch and the client sees them as one clump.
+            await asyncio.sleep(0)
 
         # Decode loop.
         if next_id != stop_id:
@@ -278,6 +284,7 @@ async def stream_events(
                 await asyncio.sleep(0)
                 for done_ev in collect_done():
                     yield done_ev
+                    await asyncio.sleep(0)
 
                 if next_id == stop_id:
                     break
@@ -296,6 +303,7 @@ async def stream_events(
             )
             for done_ev in collect_done():
                 yield done_ev
+                await asyncio.sleep(0)
 
         # Summary.
         wallclock = now()
