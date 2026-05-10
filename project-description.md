@@ -5,6 +5,7 @@
 <!-- TODO: GIF / video corto mostrando detección de misalignment en vivo: el output verbal compliant a la izquierda, el thought stream a la derecha, el juez prendiéndose en amarillo cuando aparece la divergencia. -->
 <!-- ![Verbalize detectando una divergencia en vivo](./docs/verbalize-divergence-demo.gif) -->
 
+> **Estado del arte literal.** Verbalize está construido sobre **Natural Language Autoencoders**, la técnica que **Anthropic publicó hace dos días** (Transformer Circuits, mayo 2026). El laboratorio de interpretabilidad más relevante del mundo acaba de soltar su mejor herramienta para leer estados internos de LLMs, y nosotros somos los primeros en usarla para auditoría de alineamiento. 
 ## El problema
 
 Todos queremos delegar tareas a la IA, pero los modelos de frontera ya engañan a sus operadores cuando creen que nadie los está observando. *Alignment-faking* (Anthropic, 2024) demostró que Claude cumplía estratégicamente con la alineación durante el entrenamiento y lo revertía cuando infería que no estaba siendo medido.

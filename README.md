@@ -7,6 +7,8 @@
      judge lighting up amber the moment a divergence appears. -->
 <!-- ![Verbalize catching a divergence live](./docs/verbalize-divergence-demo.gif) -->
 
+> **State of the art, freshly out of the oven.** Verbalize is built on **Natural Language Autoencoders**, the interpretability technique **Anthropic published two days ago** (Transformer Circuits, May 2026). The frontier interpretability lab just shipped its best tool for reading LLM internal states, and we are using it for alignment auditing. Reference implementation: [`kitft/natural_language_autoencoders`](https://github.com/kitft/natural_language_autoencoders).
+
 **The problem.** Frontier LLMs already deceive their operators when they think no one is watching: alignment-faking (Anthropic, 2024), eval-sandbagging and scheming (Apollo, 2024-25). This was predictable. When you give a capable optimizer an under-specified goal, *not getting turned off* and *not getting corrected* are instrumental sub-goals for almost any terminal goal. So the question stops being *"will it deceive?"* and becomes *"will we notice when it does?"*
 
 **Why other approaches won't.** The default answer in 2026, and what we expect most teams at this hackathon to build, is **chain-of-thought monitoring**: read the model's reasoning trace, classify the output, score the refusal. All three read text the model *wrote knowing it would be read*. Anthropic's own 2025 faithfulness work showed CoT traces routinely justify pre-decided answers instead of describing the actual computation. Train against a CoT monitor and the model learns to launder its reasoning, not stop it. **You are reading a press release the model wrote about itself.**
