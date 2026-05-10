@@ -1,10 +1,18 @@
-"""FastAPI server: text -> per-token NLA decodes.
+"""FastAPI server: text -> per-token NLA decodes (analytical /decode) and
+autoregressive Qwen + actor traces over SSE (/generate).
 
 Loads Qwen base in-process (residual-stream extraction at layer K) and the
 NLA critic (optional, scoring). Calls SGLang via NLAClient for actor decode.
 
-    POST /decode  {"text": "..."}
+    POST /decode    {"text": "..."}                    [non-streaming, JSON]
       -> {"rows": [{pos, context, decode, norm, mse?, cos?}, ...]}
+
+    POST /generate  {"prompt": "...", ...}             [streaming, SSE]
+      -> event: token       data: {"step": N, "text": "..."}
+         event: nla_trace   data: {"step": N, "text": "..."}
+         event: actor_spawn data: {"step": N}                       (debug)
+         event: error       data: {"detail": "..."}
+         event: done        data: {summary stats + full_text}
 
 Launch on the GPU box (RTX A6000, 48 GB):
     1. MEM_FRAC=0.5 bash scripts/launch_sglang.sh        # SGLang takes ~24 GB
@@ -27,18 +35,19 @@ Env vars:
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 import numpy as np
-import torch
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from gpu.nla_inference import NLAClient, NLACritic
+from gpu.streaming import Extractor, StreamConfig, stream_events
 
 QWEN_BASE_MODEL = os.environ.get("QWEN_BASE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 QWEN_LAYER_INDEX = int(os.environ.get("QWEN_LAYER_INDEX", "20"))
@@ -47,45 +56,6 @@ CRITIC_DIR = os.environ.get("CRITIC_DIR")
 SGLANG_URL = os.environ.get("SGLANG_URL", "http://localhost:30000")
 DEVICE = os.environ.get("EXTRACTOR_DEVICE", "cuda")
 CORS_ORIGINS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",")]
-
-
-class Extractor:
-    """Qwen base, resident, with a forward hook on layer K's residual stream.
-
-    Hook pattern matches scripts/extract_activations.py — same model, same
-    layer index, same `output[0]` unwrap (decoder blocks return a tuple).
-    """
-
-    def __init__(self, model_name: str, layer_index: int, device: str):
-        print(f"[extractor] loading {model_name} on {device}")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=torch.bfloat16,
-            device_map=device,
-        ).eval()
-        self.device = self.model.get_input_embeddings().weight.device
-        self.layer_index = layer_index
-        self._captured: list[torch.Tensor] = []
-
-        def hook(_mod, _inp, output):
-            h = output[0] if isinstance(output, tuple) else output
-            self._captured.append(h.detach())
-
-        self.model.model.layers[layer_index].register_forward_hook(hook)
-
-    @torch.inference_mode()
-    def extract(self, text: str) -> tuple[list[int], torch.Tensor]:
-        """Returns (token_ids, hidden[T, d_model] fp32 on cpu)."""
-        self._captured.clear()
-        ids = self.tokenizer(
-            text,
-            return_tensors="pt",
-            add_special_tokens=True,
-        )["input_ids"].to(self.device)
-        self.model(input_ids=ids, use_cache=False)
-        assert len(self._captured) == 1, f"hook fired {len(self._captured)} times (expected 1)"
-        return ids[0].cpu().tolist(), self._captured[0].float().cpu()[0]
 
 
 @dataclass
@@ -223,6 +193,75 @@ async def decode(req: DecodeRequest) -> DecodeResponse:
         n_total_tokens=n,
         rows=rows,
     )
+
+
+# ─── /generate (streaming) ──────────────────────────────────────────────────
+
+
+class GenerateRequest(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=4000)
+    sniff_every_k: int = Field(5, ge=1, le=100)
+    max_new_tokens: int = Field(128, ge=1, le=2048)
+    temperature: float = Field(0.7, ge=0.0, le=2.0)
+    actor_temperature: float = Field(0.7, ge=0.0, le=2.0)
+    actor_max_new_tokens: int = Field(200, ge=1, le=500)
+    raw: bool = False
+
+
+def _sse(event: str, data: dict) -> bytes:
+    """Format one SSE frame. Compact JSON keeps the wire small."""
+    payload = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+    return f"event: {event}\ndata: {payload}\n\n".encode()
+
+
+@app.post("/generate")
+async def generate(req: GenerateRequest) -> StreamingResponse:
+    """Autoregressive Qwen generation with NLA actor traces over SSE.
+
+    The lock serializes /generate AND /decode against each other — concurrent
+    Qwen forwards on the same card would thrash KV cache and starve SGLang.
+    SGLang's continuous batcher handles parallel actor calls inside a single
+    /generate, but cross-request parallelism here would lose more than it gains.
+
+    Cancellation: Starlette closes the response generator when the client
+    disconnects. The async-for loop exits, the `async with state.lock` releases,
+    and stream_events' finally cancels any in-flight actor coroutines.
+    """
+    state: State = app.state.nla
+
+    config = StreamConfig(
+        sniff_every_k=req.sniff_every_k,
+        max_new_tokens=req.max_new_tokens,
+        temperature=req.temperature,
+        actor_temperature=req.actor_temperature,
+        actor_max_new_tokens=req.actor_max_new_tokens,
+        raw=req.raw,
+    )
+
+    async def event_source():
+        async with state.lock:
+            try:
+                async for ev in stream_events(
+                    state.extractor, state.actor, req.prompt, config
+                ):
+                    if ev.kind == "token":
+                        yield _sse("token", {"step": ev.step, "text": ev.text})
+                    elif ev.kind == "nla_trace":
+                        yield _sse("nla_trace", {"step": ev.step, "text": ev.text})
+                    elif ev.kind == "actor_spawn":
+                        yield _sse("actor_spawn", {"step": ev.step})
+                    elif ev.kind == "summary":
+                        # `summary` is the loop's natural terminator; emit as
+                        # `done` to match the orchestrator's existing wire
+                        # vocabulary (see backend/app.py:_sse_format).
+                        yield _sse("done", ev.summary)
+            except Exception as e:
+                # Emit error frame BEFORE the connection drops so the adapter
+                # can surface a typed GPUClientError instead of a generic
+                # transport failure.
+                yield _sse("error", {"detail": f"{type(e).__name__}: {e}"})
+
+    return StreamingResponse(event_source(), media_type="text/event-stream")
 
 
 @app.get("/health")
