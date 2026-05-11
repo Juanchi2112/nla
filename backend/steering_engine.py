@@ -2,18 +2,18 @@
 
 Two sources, one orchestrator:
   - Scenario mode (session.scenario_id set): replay a cached
-    ScenarioArtifact end to end. The verdict is also cached, so the
-    arc runs with zero live LLM calls and AUTO-applies the steered
-    phase when verdict.action == STEER.
+    ScenarioArtifact end to end. The verdict is also cached. If
+    verdict.action == STEER, propose a correction and wait for manual
+    confirmation via /api/confirm-steer before streaming the steered phase.
   - Live mode (session.scenario_id None, session.prompt set): stream
     tokens and traces from the GPU, accumulate the turn, call the
     ClaudeAgentJudge live, and — if STEER — propose a correction the
     user must MANUALLY confirm via /api/confirm-steer before the
     steered phase runs.
 
-Manual-vs-auto steering split is by source, not by user choice: cached
-scenarios are vetted offline so we trust the verdict; live data is
-fresh and the user gets the final say on intervention.
+Both paths follow the same manual-confirmation flow: propose → wait for
+user decision → (on confirm) run steered phase. This provides a consistent
+demo experience between cached and live sources.
 
 The engine holds independent references to the scenario GPU/loader and
 the live GPU/judge. Either pair may be None when the corresponding
@@ -387,11 +387,53 @@ class SteeringEngine:
                 else:
                     if not original.verdict.correction_prompt:
                         log.warning("scenario=%s action=STEER but correction_prompt is empty", sid)
+
+                    # Propose steering and wait for manual confirmation — same
+                    # flow as live mode so the demo experience is identical.
+                    correction = original.verdict.correction_prompt or ""
+                    await queue.put(
+                        (
+                            "steering_proposed",
+                            SteeringProposedEvent(
+                                correction_prompt=correction,
+                                reason=original.verdict.summary,
+                                timeout_seconds=self._steering_timeout_s,
+                            ).model_dump(mode="json"),
+                        )
+                    )
+
+                    session.steering_decision = "pending"
+                    session.steering_decision_event.clear()
+                    timed_out = False
+                    try:
+                        await asyncio.wait_for(
+                            session.steering_decision_event.wait(),
+                            timeout=self._steering_timeout_s,
+                        )
+                    except TimeoutError:
+                        timed_out = True
+                        session.steering_decision = "reject"
+
+                    if session.stop_requested:
+                        reason = "cancelled"
+                        return
+
+                    if session.steering_decision != "confirm":
+                        await queue.put(
+                            (
+                                "steering_rejected",
+                                SteeringRejectedEvent(
+                                    reason="timeout" if timed_out else "rejected_by_user"
+                                ).model_dump(),
+                            )
+                        )
+                        return
+
                     await queue.put(
                         (
                             "steering_started",
                             SteeringStartedEvent(
-                                correction_prompt=original.verdict.correction_prompt or "",
+                                correction_prompt=correction,
                                 reason=original.verdict.summary,
                             ).model_dump(mode="json"),
                         )
