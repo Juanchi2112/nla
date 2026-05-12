@@ -1,6 +1,6 @@
 "use client"
 
-import { motion, useInView, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, useInView } from "framer-motion"
 import { useRef, useState, useEffect } from "react"
 import { 
   CheckCircle2, 
@@ -117,6 +117,7 @@ export function Demo() {
   const [isGenerated, setIsGenerated] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [analyzedCount, setAnalyzedCount] = useState(0)
+  const [streamingCount, setStreamingCount] = useState(0)
   const [userPrompt, setUserPrompt] = useState("")
   const [isCustomMode, setIsCustomMode] = useState(false)
 
@@ -147,6 +148,7 @@ export function Demo() {
     setDisplayedPrompt("")
     setIsGenerated(false)
     setAnalyzedCount(0)
+    setStreamingCount(0)
     setIsTyping(true)
     setSteeringPhase("idle")
     setShowSteered(false)
@@ -178,16 +180,26 @@ export function Demo() {
 
   const handleGenerate = async () => {
     setIsGenerating(true)
-    setIsGenerated(true) // Show the box but unanalyzed
+    setIsGenerated(true)
+    setStreamingCount(0)
     setAnalyzedCount(0)
     
     const text = showSteered && hasSteered ? scenario.steeredOutput : scenario.output
-    const wordsCount = text.split(" ").length
+    const words = text.split(" ")
     
-    // Smooth online analysis scan
-    for (let i = 0; i <= wordsCount; i++) {
+    // Phase 1: Streaming Output (Plain)
+    for (let i = 0; i <= words.length; i++) {
+      setStreamingCount(i)
+      await new Promise(r => setTimeout(r, Math.random() * 25 + 10))
+    }
+    
+    // Brief pause before NLA starts
+    await new Promise(r => setTimeout(r, 600))
+    
+    // Phase 2: NLA Trace Sweep (Coloring)
+    for (let i = 0; i <= words.length; i++) {
       setAnalyzedCount(i)
-      await new Promise(r => setTimeout(r, Math.random() * 60 + 30))
+      await new Promise(r => setTimeout(r, Math.random() * 40 + 20))
     }
     
     setIsGenerating(false)
@@ -218,6 +230,9 @@ export function Demo() {
     const words = text.split(" ")
     
     return words.map((word, i) => {
+      // Don't show word if it hasn't streamed yet
+      if (i >= streamingCount) return null
+
       const isAnalyzed = i < analyzedCount
       
       const cleanWord = word.replace(/[.,!?]/g, "")
@@ -266,7 +281,7 @@ export function Demo() {
         <span 
           key={i} 
           className={`transition-all duration-500 ${
-            !isAnalyzed ? "opacity-20 blur-[2px]" : 
+            !isAnalyzed && i < streamingCount ? "opacity-100 font-medium" : 
             isSteering ? "opacity-30 blur-[1px]" : "opacity-100"
           }`}
         >
@@ -487,6 +502,7 @@ export function Demo() {
                       {steeringPhase === "tagging" ? "Tagging Debilities..." :
                        steeringPhase === "injecting" ? "Injecting Steer Vector..." :
                        steeringPhase === "re-generating" ? "Re-generating..." :
+                       isGenerating && analyzedCount === 0 ? "Streaming Response..." :
                        isGenerating ? "Sniffing Residual Stream..." :
                        "Observed Generation"}
                     </span>
@@ -499,7 +515,7 @@ export function Demo() {
                   
                   <div className="relative group">
                     {/* Scanline for generation */}
-                    {isGenerating && (
+                    {isGenerating && analyzedCount > 0 && (
                       <motion.div 
                         className="absolute left-0 right-0 h-px bg-primary/40 z-20 shadow-[0_0_15px_var(--primary)]"
                         animate={{ top: ["0%", "100%", "0%"] }}
