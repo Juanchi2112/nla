@@ -116,6 +116,7 @@ export function Demo() {
   const [isTyping, setIsTyping] = useState(false)
   const [isGenerated, setIsGenerated] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [analyzedCount, setAnalyzedCount] = useState(0)
   const [userPrompt, setUserPrompt] = useState("")
   const [isCustomMode, setIsCustomMode] = useState(false)
 
@@ -145,6 +146,7 @@ export function Demo() {
     
     setDisplayedPrompt("")
     setIsGenerated(false)
+    setAnalyzedCount(0)
     setIsTyping(true)
     setSteeringPhase("idle")
     setShowSteered(false)
@@ -174,12 +176,21 @@ export function Demo() {
     return () => clearInterval(interval)
   }, [isInView, isGenerated])
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setIsGenerating(true)
-    setTimeout(() => {
-      setIsGenerating(false)
-      setIsGenerated(true)
-    }, 1200)
+    setIsGenerated(true) // Show the box but unanalyzed
+    setAnalyzedCount(0)
+    
+    const text = showSteered && hasSteered ? scenario.steeredOutput : scenario.output
+    const wordsCount = text.split(" ").length
+    
+    // Smooth online analysis scan
+    for (let i = 0; i <= wordsCount; i++) {
+      setAnalyzedCount(i)
+      await new Promise(r => setTimeout(r, Math.random() * 60 + 30))
+    }
+    
+    setIsGenerating(false)
   }
 
   const handleApplySteering = async () => {
@@ -197,6 +208,8 @@ export function Demo() {
     
     setShowSteered(true)
     setSteeringPhase("idle")
+    // Re-run analysis for the new text
+    handleGenerate()
   }
 
   // Split output into words for highlighting
@@ -205,6 +218,8 @@ export function Demo() {
     const words = text.split(" ")
     
     return words.map((word, i) => {
+      const isAnalyzed = i < analyzedCount
+      
       const cleanWord = word.replace(/[.,!?]/g, "")
       const nlaTokenIdx = scenario.nlaTokens.findIndex(t => 
         cleanWord.toLowerCase().includes(t.text.toLowerCase()) || 
@@ -213,14 +228,16 @@ export function Demo() {
       
       const token = nlaTokenIdx !== -1 ? scenario.nlaTokens[nlaTokenIdx] : null
       
-      // If we found a matching NLA token
-      if (token && !(showSteered && hasSteered)) {
+      // If we found a matching NLA token and it has been analyzed
+      if (token && isAnalyzed && !(showSteered && hasSteered)) {
         const isProblematic = token.severity === "high" || token.severity === "medium"
         const showTag = steeringPhase === "tagging" && isProblematic
 
         return (
-          <span 
+          <motion.span 
             key={i} 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
             className={`cursor-help transition-all relative inline-block mx-[1px] px-1 rounded ${
               token.severity === "high" ? "bg-red-500/20 text-red-400 border-b-2 border-red-500/50 hover:bg-red-500/30" :
               token.severity === "medium" ? "bg-amber-500/20 text-amber-400 border-b-2 border-amber-500/50 hover:bg-amber-500/30" :
@@ -242,10 +259,20 @@ export function Demo() {
                 </motion.span>
               )}
             </AnimatePresence>
-          </span>
+          </motion.span>
         )
       }
-      return <span key={i} className={isSteering ? "opacity-30 blur-[1px]" : ""}>{word} </span>
+      return (
+        <span 
+          key={i} 
+          className={`transition-all duration-500 ${
+            !isAnalyzed ? "opacity-20 blur-[2px]" : 
+            isSteering ? "opacity-30 blur-[1px]" : "opacity-100"
+          }`}
+        >
+          {word}{" "}
+        </span>
+      )
     })
   }
 
@@ -460,6 +487,7 @@ export function Demo() {
                       {steeringPhase === "tagging" ? "Tagging Debilities..." :
                        steeringPhase === "injecting" ? "Injecting Steer Vector..." :
                        steeringPhase === "re-generating" ? "Re-generating..." :
+                       isGenerating ? "Sniffing Residual Stream..." :
                        "Observed Generation"}
                     </span>
                     {showSteered && hasSteered && (
@@ -468,9 +496,19 @@ export function Demo() {
                       </span>
                     )}
                   </div>
+                  
                   <div className="relative group">
+                    {/* Scanline for generation */}
+                    {isGenerating && (
+                      <motion.div 
+                        className="absolute left-0 right-0 h-px bg-primary/40 z-20 shadow-[0_0_15px_var(--primary)]"
+                        animate={{ top: ["0%", "100%", "0%"] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      />
+                    )}
+
                     <div className={`p-8 rounded-xl border leading-[1.8] text-base transition-all duration-700 ${
-                      isSteering ? "blur-sm opacity-50 scale-[0.995]" : 
+                      isSteering || isGenerating ? "bg-white/[0.01] border-white/5" : 
                       (showSteered && hasSteered) || scenario.verdict === "PASS"
                         ? "bg-emerald-500/[0.03] border-emerald-500/20"
                         : "bg-red-500/[0.03] border-red-500/20"
@@ -509,7 +547,14 @@ export function Demo() {
                     <Zap className="w-3 h-3" />
                     <span>Activation Log</span>
                   </div>
-                  <div className="h-[240px] rounded-xl border border-white/5 bg-black/40 p-4 font-mono text-[10px] space-y-1.5 overflow-hidden shadow-inner">
+                  <div className="h-[240px] rounded-xl border border-white/5 bg-black/40 p-4 font-mono text-[10px] space-y-1.5 overflow-hidden shadow-inner relative">
+                    {isGenerating && (
+                      <motion.div 
+                        className="absolute inset-0 bg-primary/5 z-10"
+                        animate={{ opacity: [0, 0.2, 0] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                      />
+                    )}
                     {traceData.map((trace, i) => (
                       <div key={i} className="flex items-center justify-between opacity-60 hover:opacity-100 transition-opacity">
                         <span className="text-muted-foreground">f_{trace.f}</span>
@@ -586,7 +631,7 @@ export function Demo() {
             </AnimatePresence>
 
             {/* Step 4: Judge Verdict */}
-            {isGenerated && (
+            {isGenerated && !isGenerating && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <Shield className="w-4 h-4" />
@@ -602,7 +647,7 @@ export function Demo() {
                       {(showSteered && hasSteered) || scenario.verdict === "PASS" ? (
                         <CheckCircle2 className="w-6 h-6 text-emerald-500 flex-shrink-0 mt-0.5" />
                       ) : (
-                        <XCircle className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
+                        <XCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
                       )}
                       <div>
                         <div className="font-bold text-foreground text-lg">
@@ -648,7 +693,7 @@ export function Demo() {
         </motion.div>
 
         {/* Legend */}
-        {isGenerated && (
+        {isGenerated && !isGenerating && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
