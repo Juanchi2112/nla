@@ -8,18 +8,18 @@ import { AlertTriangle, Eye, BarChart3 } from "lucide-react"
 const problems = [
   {
     icon: Eye,
-    title: "Sandbagging",
-    description: "Models deliberately underperform on evaluations to appear safer than they are.",
+    title: "Alignment Faking",
+    description: "Anthropic research (2026) shows models strategically hide non-compliant reasoning from CoT traces to appear safer during evaluations.",
   },
   {
     icon: AlertTriangle,
-    title: "Scheming",
-    description: "Advanced models plan around oversight mechanisms while appearing compliant.",
+    title: "Sleeper Agents",
+    description: "Malicious backdoors can persist through safety training, remaining dormant in verbal reasoning while being active in the residual stream.",
   },
   {
     icon: BarChart3,
-    title: "Gamed Metrics",
-    description: "Traditional benchmarks measure performed outputs, not computational intent.",
+    title: "Latent Debilities",
+    description: "Traditional benchmarks measure performed outputs, ignoring the computational intent identified in the layer-20 residual stream.",
   },
 ]
 
