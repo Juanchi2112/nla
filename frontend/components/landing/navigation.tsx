@@ -1,8 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -16,26 +15,37 @@ const navLinks = [
 
 export function Navigation() {
   const [isOpen, setIsOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 20)
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/60 backdrop-blur-xl border-b border-white/5">
+    <header 
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled ? "bg-background/60 backdrop-blur-xl border-b border-white/5 py-3" : "bg-transparent py-5"
+      }`}
+    >
       <nav className="max-w-7xl mx-auto px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group transition-transform hover:scale-[1.02]">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
+            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
               <Shield className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-bold text-xl tracking-tight text-foreground">Verbalize</span>
+            <span className="font-bold text-2xl tracking-tight text-foreground">Verbalize</span>
           </Link>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden md:flex items-center gap-10">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-xs font-semibold uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors"
+                className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground hover:text-primary transition-colors"
               >
                 {link.label}
               </Link>
@@ -46,48 +56,46 @@ export function Navigation() {
           <div className="hidden md:flex items-center gap-4">
             <Link href="/contact">
               <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-full px-6 h-10 shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5">
-                Contact Us
+                Get Access
               </Button>
             </Link>
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
+          {/* Mobile toggle */}
+          <button 
+            className="md:hidden p-2 text-muted-foreground hover:text-foreground" 
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 text-muted-foreground hover:text-foreground"
             aria-label="Toggle menu"
           >
-            {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
 
-        {/* Mobile Menu */}
+        {/* Mobile menu */}
         <AnimatePresence>
           {isOpen && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="md:hidden border-t border-border"
+              className="md:hidden pt-4 pb-6 space-y-4"
             >
-              <div className="py-4 space-y-3">
+              <div className="border-t border-white/5 pt-4 flex flex-col gap-4">
                 {navLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="block text-sm font-medium text-muted-foreground hover:text-foreground py-2"
                     onClick={() => setIsOpen(false)}
+                    className="block text-sm font-semibold uppercase tracking-widest text-muted-foreground py-2 hover:text-primary"
                   >
                     {link.label}
                   </Link>
                 ))}
-                <div className="pt-4">
-                  <Link href="/contact" onClick={() => setIsOpen(false)}>
-                    <Button size="sm" className="w-full bg-foreground text-background rounded-full">
-                      Contact Us
-                    </Button>
-                  </Link>
-                </div>
+                <Link href="/contact" onClick={() => setIsOpen(false)}>
+                  <Button className="w-full mt-4 bg-primary text-primary-foreground font-bold rounded-full py-6">
+                    Get Access
+                  </Button>
+                </Link>
               </div>
             </motion.div>
           )}

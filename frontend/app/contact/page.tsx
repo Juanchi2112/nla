@@ -7,6 +7,8 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Send, CheckCircle2, Mail, Building2, MessageSquare } from "lucide-react"
 
+import { Navigation } from "@/components/landing/navigation"
+
 export default function ContactPage() {
   const [formState, setFormState] = useState<"idle" | "submitting" | "success">("idle")
   const [formData, setFormData] = useState({
@@ -36,45 +38,27 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-2.5">
-              <Image 
-                src="/logo.svg" 
-                alt="Verbalize" 
-                width={28} 
-                height={28}
-                className="w-7 h-7"
-              />
-              <span className="font-semibold text-lg tracking-tight text-foreground">Verbalize</span>
-            </Link>
-            
-            <Link href="/">
-              <Button variant="ghost" size="sm" className="gap-2">
-                <ArrowLeft className="w-4 h-4" />
-                Back to Home
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Navigation />
 
-      <main className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+      <main className="pt-40 pb-24 px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20">
+          <div className="grid lg:grid-cols-2 gap-16 lg:gap-24">
             {/* Left column - Info */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <h1 className="text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
-                Get in Touch
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-bold uppercase tracking-widest mb-8">
+                Enterprise & Research
+              </div>
+              <h1 className="text-5xl lg:text-7xl font-bold tracking-tight text-foreground leading-[1.1]">
+                Request a<br />
+                <span className="text-primary">Briefing.</span>
               </h1>
-              <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
-                Interested in Verbalize for your organization? Have questions about our alignment auditing technology? We&apos;d love to hear from you.
+              <p className="mt-8 text-xl text-muted-foreground leading-relaxed">
+                Verbalize provides high-fidelity interpretability for safety-critical systems. 
+                Contact our engineering team to discuss integration or research partnerships.
               </p>
 
               <div className="mt-12 space-y-8">

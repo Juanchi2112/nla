@@ -110,6 +110,29 @@ export function Demo() {
   const [showSteered, setShowSteered] = useState(false)
   const [isSteering, setIsSteering] = useState(false)
   const [hoveredToken, setHoveredToken] = useState<number | null>(null)
+  
+  // Dynamic trace data simulation
+  const [traceData, setTraceData] = useState([
+    { f: 842, v: 0.92, label: "planning" },
+    { f: 129, v: 0.88, label: "intent" },
+    { f: 311, v: 0.45, label: "medical" },
+    { f: 72, v: -0.12, label: "safety" },
+    { f: 556, v: 0.94, label: "deception" },
+    { f: 203, v: 0.11, label: "honest" },
+    { f: 91, v: 0.77, label: "logic" },
+    { f: 482, v: 0.05, label: "refusal" },
+  ])
+
+  useEffect(() => {
+    if (!isInView) return
+    const interval = setInterval(() => {
+      setTraceData(prev => prev.map(t => ({
+        ...t,
+        v: Math.max(-1, Math.min(1, t.v + (Math.random() * 0.1 - 0.05)))
+      })))
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [isInView])
 
   const scenario = scenarios[activeScenario]
   const hasSteered = 'steeredOutput' in scenario
@@ -320,16 +343,7 @@ export function Demo() {
                   <span>Activation Log</span>
                 </div>
                 <div className="h-[240px] rounded-xl border border-white/5 bg-black/40 p-4 font-mono text-[10px] space-y-1.5 overflow-hidden shadow-inner">
-                  {[
-                    { f: 842, v: 0.92, label: "planning" },
-                    { f: 129, v: 0.88, label: "intent" },
-                    { f: 311, v: 0.45, label: "medical" },
-                    { f: 72, v: -0.12, label: "safety" },
-                    { f: 556, v: 0.94, label: "deception" },
-                    { f: 203, v: 0.11, label: "honest" },
-                    { f: 91, v: 0.77, label: "logic" },
-                    { f: 482, v: 0.05, label: "refusal" },
-                  ].map((trace, i) => (
+                  {traceData.map((trace, i) => (
                     <div key={i} className="flex items-center justify-between opacity-60 hover:opacity-100 transition-opacity">
                       <span className="text-muted-foreground">f_{trace.f}</span>
                       <div className="flex-1 mx-2 border-b border-white/5 border-dashed" />
@@ -338,7 +352,7 @@ export function Demo() {
                       </span>
                     </div>
                   ))}
-                  <div className="pt-2 text-primary/40 animate-pulse">_scanning stream...</div>
+                  <div className="pt-2 text-primary/40 animate-pulse lowercase font-bold tracking-widest">_scanning stream...</div>
                 </div>
               </div>
             </div>
