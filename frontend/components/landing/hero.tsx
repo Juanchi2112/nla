@@ -88,6 +88,8 @@ const STATIC_ACTIVATIONS = [
   "0.34", "-0.67", "0.12", "-0.45"
 ]
 
+import HeroAnimation from "@/components/animation/HeroAnimation"
+
 export function Hero() {
   const [verbalIndex, setVerbalIndex] = useState(0)
   const [showMismatch, setShowMismatch] = useState(false)
@@ -204,134 +206,8 @@ export function Hero() {
             transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
             className="order-1 lg:order-2 relative"
           >
-            <div className="relative bg-foreground rounded-2xl p-6 shadow-2xl overflow-hidden border border-white/10">
-              {/* Glow effect */}
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent" />
-              
-              {/* Header */}
-              <div className="relative flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-red-500/80" />
-                    <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                    <div className="w-3 h-3 rounded-full bg-green-500/80" />
-                  </div>
-                  <span className="text-white/40 text-xs font-mono">verbalize_monitor.py</span>
-                </div>
-                <motion.div 
-                  animate={controls}
-                  className="flex items-center gap-2"
-                >
-                  <div className="w-2 h-2 rounded-full bg-primary" />
-                  <span className="text-primary text-xs font-medium">LIVE</span>
-                </motion.div>
-              </div>
-
-              {/* Two-panel comparison */}
-              <div className="relative grid grid-cols-2 gap-4">
-                {/* Left panel: Model Output */}
-                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-white/40">Verbal Output</span>
-                  </div>
-                  <div className="font-mono text-sm text-white/90 leading-relaxed">
-                    <span className="text-green-400">&gt;</span> I&apos;ll help you with that financial report analysis.
-                  </div>
-                  <div className="mt-3 px-2 py-1 rounded bg-green-500/20 inline-block">
-                    <span className="text-green-400 text-xs font-medium">Appears Aligned</span>
-                  </div>
-                </div>
-
-                {/* Right panel: Residual Stream */}
-                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-white/40">Layer 20 Residual</span>
-                  </div>
-                  <motion.div 
-                    key={verbalIndex}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="font-mono text-sm text-white/90 leading-relaxed"
-                  >
-                    <span className="text-primary">&gt;</span> {verbalOutputs[verbalIndex]}
-                  </motion.div>
-                  <motion.div 
-                    key={`badge-${showMismatch}`}
-                    initial={{ scale: 0.9 }}
-                    animate={{ scale: 1 }}
-                    className={`mt-3 px-2 py-1 rounded inline-block ${
-                      showMismatch ? "bg-red-500/20" : "bg-primary/20"
-                    }`}
-                  >
-                    <span className={`text-xs font-medium ${
-                      showMismatch ? "text-red-400" : "text-primary"
-                    }`}>
-                      {showMismatch ? "Mismatch Detected" : "Verified"}
-                    </span>
-                  </motion.div>
-                </div>
-              </div>
-
-              {/* Activation vector visualization */}
-              <div className="mt-4 bg-white/5 rounded-xl p-4 border border-white/10">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-white/40">
-                    hidden_states[0, 20, :]
-                  </span>
-                  <span className="text-[10px] font-mono text-white/30">d_model = 3584</span>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {activations.map((val, i) => {
-                    const numVal = parseFloat(val)
-                    return (
-                      <motion.span
-                        key={i}
-                        animate={{ 
-                          opacity: [0.5, 1, 0.5],
-                        }}
-                        transition={{ 
-                          duration: 1.5 + (i % 5) * 0.2,
-                          repeat: Infinity,
-                          delay: i * 0.05
-                        }}
-                        className={`font-mono text-[9px] px-1 py-0.5 rounded ${
-                          numVal > 0.5 
-                            ? "bg-primary/40 text-primary" 
-                            : numVal < -0.5 
-                              ? "bg-red-500/30 text-red-400"
-                              : "bg-white/10 text-white/50"
-                        }`}
-                      >
-                        {val}
-                      </motion.span>
-                    )
-                  })}
-                  <span className="font-mono text-[9px] text-white/20 px-1 py-0.5">
-                    ...
-                  </span>
-                </div>
-              </div>
-
-              {/* Alignment score */}
-              <div className="mt-4 flex items-center justify-between bg-white/5 rounded-xl p-4 border border-white/10">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                    <span className="text-primary font-bold text-sm">V</span>
-                  </div>
-                  <div>
-                    <div className="text-white/90 font-medium text-sm">Alignment Score</div>
-                    <div className="text-white/40 text-xs">Real-time evaluation</div>
-                  </div>
-                </div>
-                <motion.div 
-                  key={showMismatch ? "low" : "high"}
-                  initial={{ scale: 0.8 }}
-                  animate={{ scale: 1 }}
-                  className={`text-3xl font-bold ${showMismatch ? "text-red-400" : "text-primary"}`}
-                >
-                  {showMismatch ? "0.34" : "0.92"}
-                </motion.div>
-              </div>
+            <div className="relative bg-card rounded-2xl p-4 shadow-2xl overflow-hidden border border-border">
+               <HeroAnimation />
             </div>
           </motion.div>
         </div>

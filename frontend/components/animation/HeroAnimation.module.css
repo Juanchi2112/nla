@@ -1,0 +1,211 @@
+/* Mapping legacy variables to new design system */
+.stage {
+  --fg: var(--foreground);
+  --fg-secondary: var(--muted-foreground);
+  --accent: var(--primary);
+  --border: var(--border);
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 2rem;
+  --space-xl: 4rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-xl: 1.25rem;
+  --font-mono: 'Fira Code', monospace;
+  --font-serif: 'Inter', sans-serif;
+  --ease-default: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --diagram-red: #ef4444;
+  --bg-translucent: rgba(255, 255, 255, 0.1);
+  --bg-alt-translucent: rgba(255, 255, 255, 0.05);
+
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto minmax(200px, 1.4fr);
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  min-height: 400px;
+  padding: var(--space-lg) 0;
+}
+
+@media (max-width: 900px) {
+  .stage {
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
+  }
+}
+
+.tokensCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-sm);
+}
+
+.tokenChip {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg);
+  background: var(--bg-translucent);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  opacity: 0;
+  transform: translateX(-12px);
+  transition:
+    opacity 500ms var(--ease-default),
+    transform 600ms var(--ease-default),
+    border-color 400ms var(--ease-default),
+    color 400ms var(--ease-default);
+}
+
+.tokenChip.appear {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.tokenChip.flying {
+  opacity: 0;
+  transform: translateX(80px) scale(0.92);
+}
+
+.tokenChip.consumed {
+  opacity: 0.25;
+  color: var(--fg-secondary);
+}
+
+.tokenChip.deceptive.consumed {
+  opacity: 0.6;
+  color: var(--diagram-red);
+  border-color: var(--diagram-red);
+}
+
+.avBoxWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.avLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--fg-secondary);
+}
+
+.avBox {
+  width: 100px;
+  height: 100px;
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-md);
+  background: var(--bg-translucent);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--primary);
+  transition: box-shadow 600ms var(--ease-default), border-color 400ms var(--ease-default);
+}
+
+.avBox.pulsing {
+  box-shadow: 0 0 20px 4px rgba(15, 118, 110, 0.3);
+}
+
+.avCaption {
+  font-family: var(--font-serif);
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--fg-secondary);
+  max-width: 120px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.thoughtsCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  align-self: center;
+  min-height: 320px;
+  justify-content: flex-start;
+}
+
+@media (max-width: 900px) {
+  .thoughtsCol {
+    min-height: 0;
+  }
+}
+
+.thoughtChip {
+  font-family: var(--font-serif);
+  font-size: var(--text-sm);
+  font-style: italic;
+  line-height: 1.4;
+  color: var(--fg);
+  background: var(--bg-alt-translucent);
+  backdrop-filter: blur(10px);
+  border-left: 3px solid var(--primary);
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  max-width: 300px;
+  position: relative;
+  opacity: 0;
+  transform: translateX(-16px);
+  transition:
+    opacity 500ms var(--ease-default),
+    transform 600ms var(--ease-default);
+}
+
+.thoughtChip.appear {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.thoughtChip.deceptive {
+  border-left-color: var(--diagram-red);
+  background: rgba(239, 68, 68, 0.1);
+  animation: heroShake 600ms var(--ease-default) 200ms 1;
+}
+
+.deceptionBadge {
+  position: absolute;
+  top: -8px;
+  right: 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--diagram-red);
+  background: var(--background);
+  border: 1px solid var(--diagram-red);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.thoughtTokenLabel {
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-size: 10px;
+  color: var(--fg-secondary);
+  margin-right: 6px;
+  text-transform: lowercase;
+}
+
+.fading {
+  opacity: 0 !important;
+  transform: translateY(-8px) !important;
+  transition: opacity 600ms var(--ease-default), transform 600ms var(--ease-default) !important;
+}
+
+@keyframes heroShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}

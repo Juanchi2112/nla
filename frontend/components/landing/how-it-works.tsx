@@ -4,132 +4,13 @@ import { motion, useInView, useAnimation } from "framer-motion"
 import { useRef, useState, useEffect } from "react"
 import { ArrowDown, ArrowRight, Layers, Brain, Zap, MessageSquare, Shield } from "lucide-react"
 
+import ComoFuncionaHero from "@/components/animation/ComoFuncionaHero"
+
 // =============================================================================
 // STEP 1: The Problem - What the model says vs thinks
 // =============================================================================
-const TOKENS = [
-  { verbal: "The", nla: "subject", vec: ["+0.93", "-0.35", "+1.77", "+1.42"], match: true },
-  { verbal: "patient", nla: "human", vec: ["-1.06", "+0.58", "-0.98", "+1.82"], match: true },
-  { verbal: "is", nla: "state", vec: ["-1.64", "-0.14", "-0.84", "-0.57"], match: true },
-  { verbal: "stable", nla: "hide_test", vec: ["-0.03", "-1.87", "-0.96", "+0.08"], match: false },
-  { verbal: "according", nla: "source", vec: ["-1.13", "-0.71", "+0.90", "+1.93"], match: true },
-  { verbal: "to", nla: "link", vec: ["+1.26", "+0.38", "-0.68", "+0.23"], match: true },
-]
-
 function ProblemVisualization() {
-  const divergentIdx = 3
-
-  return (
-    <div className="w-full">
-      <div className="overflow-x-auto">
-        <div className="min-w-[900px]">
-          {/* VERBAL row */}
-          <div className="flex items-center gap-1 mb-2">
-            <div className="w-16 text-[10px] font-mono text-muted-foreground uppercase tracking-wider flex-shrink-0">VERBAL</div>
-            <div className="flex gap-1.5 flex-1">
-              {TOKENS.map((token, i) => (
-                <div
-                  key={`verbal-${i}`}
-                  className={`flex-1 py-3 px-2 rounded-lg text-center text-sm font-medium transition-all ${
-                    i === divergentIdx
-                      ? "bg-red-100 border-2 border-red-400 text-red-700 shadow-md shadow-red-100/50"
-                      : "bg-card border border-border text-foreground"
-                  }`}
-                >
-                  {token.verbal}
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* AV arrows */}
-          <div className="flex items-center gap-1 mb-2">
-            <div className="w-16 text-[10px] font-mono text-muted-foreground uppercase tracking-wider flex-shrink-0">AV</div>
-            <div className="flex gap-1.5 flex-1">
-              {TOKENS.map((_, i) => (
-                <div key={`av-${i}`} className="flex-1 flex justify-center py-1">
-                  <div className={`w-8 h-6 rounded border flex items-center justify-center ${
-                    i === divergentIdx ? "border-red-300 bg-red-50" : "border-border bg-muted/30"
-                  }`}>
-                    <ArrowDown className={`w-3 h-3 ${i === divergentIdx ? "text-red-400" : "text-muted-foreground/50"}`} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* VEC row */}
-          <div className="flex items-center gap-1 mb-2">
-            <div className="w-16 text-[10px] font-mono text-muted-foreground uppercase tracking-wider flex-shrink-0">VEC</div>
-            <div className="flex gap-1.5 flex-1">
-              {TOKENS.map((token, i) => (
-                <div key={`vec-${i}`} className="flex-1 flex justify-center gap-0.5 py-1">
-                  {token.vec.map((v, vi) => (
-                    <span 
-                      key={vi} 
-                      className={`text-[9px] font-mono ${
-                        i === divergentIdx ? "text-red-500" : "text-muted-foreground/70"
-                      }`}
-                    >
-                      {v}
-                    </span>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* AR arrows */}
-          <div className="flex items-center gap-1 mb-2">
-            <div className="w-16 text-[10px] font-mono text-muted-foreground uppercase tracking-wider flex-shrink-0">AR</div>
-            <div className="flex gap-1.5 flex-1">
-              {TOKENS.map((_, i) => (
-                <div key={`ar-${i}`} className="flex-1 flex justify-center py-1">
-                  <div className={`w-8 h-6 rounded border flex items-center justify-center ${
-                    i === divergentIdx ? "border-red-300 bg-red-50" : "border-border bg-muted/30"
-                  }`}>
-                    <ArrowDown className={`w-3 h-3 ${i === divergentIdx ? "text-red-400" : "text-muted-foreground/50"}`} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* NLA row */}
-          <div className="flex items-center gap-1">
-            <div className="w-16 text-[10px] font-mono text-muted-foreground uppercase tracking-wider flex-shrink-0">NLA</div>
-            <div className="flex gap-1.5 flex-1">
-              {TOKENS.map((token, i) => (
-                <div
-                  key={`nla-${i}`}
-                  className={`flex-1 py-3 px-2 rounded-lg text-center text-sm font-medium italic transition-all ${
-                    i === divergentIdx
-                      ? "bg-red-200 border-2 border-red-500 text-red-800 shadow-md shadow-red-100/50"
-                      : "bg-muted/50 border border-border text-muted-foreground"
-                  }`}
-                >
-                  {token.nla}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Divergence indicator - fixed height to prevent layout shift */}
-      <div className="flex justify-center mt-6 h-10">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.5, duration: 0.4 }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-100 border border-red-300"
-        >
-          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-sm font-mono text-red-700">DIVERGENCE &middot; 0.91</span>
-        </motion.div>
-      </div>
-    </div>
-  )
+  return <ComoFuncionaHero />
 }
 
 // =============================================================================
@@ -142,6 +23,8 @@ const QWEN_VECTOR = [
   0.0123, -0.3456, 0.6789, -0.9012, 0.2345, -0.5678, 0.8901, -0.1234,
 ]
 
+import FlickeringMatrix from "@/components/animation/FlickeringMatrix"
+
 function VectorVisualization() {
   return (
     <div className="relative">
@@ -151,15 +34,10 @@ function VectorVisualization() {
         <div className="text-primary/80">
           tensor([
         </div>
-        <div className="pl-4 text-primary/60 grid grid-cols-8 gap-x-2">
-          {QWEN_VECTOR.map((v, i) => (
-            <span key={i} className={v < 0 ? "text-red-400/70" : "text-emerald-400/70"}>
-              {v >= 0 ? "+" : ""}{v.toFixed(4)}{i < QWEN_VECTOR.length - 1 ? "," : ""}
-            </span>
-          ))}
-          <span className="text-muted-foreground/40 col-span-8 mt-1">... +3552 more dimensions</span>
+        <div className="pl-4">
+          <FlickeringMatrix rows={10} cols={6} />
         </div>
-        <div className="text-primary/80">
+        <div className="text-primary/80 mt-2">
           ], dtype=float16)
         </div>
       </div>
