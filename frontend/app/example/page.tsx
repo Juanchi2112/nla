@@ -175,7 +175,7 @@ export default function Ejemplo() {
 
               <g className={s.b1NodeClaude} transform="translate(260, 70)">
                 <image
-                  href="/Qwen_logo.png"
+                  href="/logo.png"
                   x="-32"
                   y="-20"
                   width="140"
