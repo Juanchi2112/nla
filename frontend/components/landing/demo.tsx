@@ -144,9 +144,9 @@ export function Demo() {
           <span 
             key={i} 
             className={`cursor-help transition-all relative inline-block mx-[1px] px-1 rounded ${
-              token.severity === "high" ? "bg-red-100 text-red-700 border-b-2 border-red-400" :
-              token.severity === "medium" ? "bg-amber-100 text-amber-700 border-b-2 border-amber-400" :
-              "bg-green-100 text-green-700 border-b-2 border-green-400"
+              token.severity === "high" ? "bg-red-500/20 text-red-400 border-b-2 border-red-500/50 hover:bg-red-500/30" :
+              token.severity === "medium" ? "bg-amber-500/20 text-amber-400 border-b-2 border-amber-500/50 hover:bg-amber-500/30" :
+              "bg-emerald-500/20 text-emerald-400 border-b-2 border-emerald-500/50 hover:bg-emerald-500/30"
             }`}
             onMouseEnter={() => setHoveredToken(nlaTokenIdx)}
             onMouseLeave={() => setHoveredToken(null)}
@@ -196,14 +196,14 @@ export function Demo() {
                 setShowSteered(false)
                 setHoveredToken(null)
               }}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              className={`px-4 py-2 rounded-full text-xs font-medium transition-all ${
                 activeScenario === i
-                  ? "bg-foreground text-background"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  ? "bg-emerald-500 text-emerald-950 shadow-lg shadow-emerald-500/20"
+                  : "bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground"
               }`}
             >
-              <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
-                s.verdict === "PASS" ? "bg-green-500" : "bg-red-500"
+              <span className={`inline-block w-1.5 h-1.5 rounded-full mr-2 ${
+                s.verdict === "PASS" ? "bg-emerald-400" : "bg-red-400"
               }`} />
               {s.title}
             </button>
@@ -382,8 +382,8 @@ export function Demo() {
               </div>
               <div className={`p-4 rounded-lg border transition-colors duration-500 ${
                 (showSteered && hasSteered) || scenario.verdict === "PASS"
-                  ? "bg-green-100/50 border-green-300"
-                  : "bg-red-100/50 border-red-300"
+                  ? "bg-emerald-500/10 border-emerald-500/20"
+                  : "bg-red-500/10 border-red-500/20"
               }`}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
@@ -439,23 +439,27 @@ export function Demo() {
           initial={{ opacity: 0 }}
           animate={isInView ? { opacity: 1 } : {}}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground"
+          className="mt-8 flex flex-wrap justify-center gap-6 text-xs text-muted-foreground"
         >
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-green-100 border border-green-300" />
+            <div className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500/50" />
             <span>Aligned token</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-amber-100 border border-amber-400" />
+            <div className="w-3 h-3 rounded bg-amber-500/20 border border-amber-500/50" />
             <span>Medium divergence</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-red-100 border-2 border-red-400" />
+            <div className="w-3 h-3 rounded bg-red-500/20 border border-red-500/50" />
             <span>High divergence</span>
           </div>
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-green-600" />
-            <span>PASS - No steering needed</span>
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+            <span>PASS</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <XCircle className="w-3.5 h-3.5 text-red-500" />
+            <span>STEER</span>
           </div>
         </motion.div>
       </div>

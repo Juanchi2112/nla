@@ -112,46 +112,49 @@ export function Hero() {
   }, [controls])
 
   return (
-    <section className="relative min-h-screen flex items-center pt-16 overflow-hidden bg-background">
+    <section className="relative min-h-screen flex items-center pt-20 overflow-hidden bg-background">
       {/* Static neural pattern background */}
-      <NeuralPatternBackground />
+      <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--primary)_0%,_transparent_70%)] opacity-10" />
+        <NeuralPatternBackground />
+      </div>
 
-      <div className="relative max-w-7xl mx-auto px-6 lg:px-8 py-16 lg:py-24 w-full z-10">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+      <div className="relative max-w-7xl mx-auto px-6 lg:px-8 py-20 lg:py-32 w-full z-10">
+        <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
           {/* Left: Content */}
           <div className="order-2 lg:order-1">
             {/* Eyebrow */}
             <motion.div
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ duration: 0.5, delay: 0.1 }}
             >
-              <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-background/90 backdrop-blur-sm border border-border text-sm font-medium text-muted-foreground shadow-sm">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                Built on Anthropic&apos;s Natural Language Autoencoders
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary tracking-wide uppercase">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                Authored by Mech Interp Frontier
               </span>
             </motion.div>
 
             {/* H1 */}
             <motion.h1
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-8 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground"
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="mt-8 text-5xl lg:text-7xl font-bold tracking-tight text-foreground leading-[1.1]"
             >
-              <span className="block">Stop trusting</span>
-              <span className="block">what models say.</span>
-              <span className="block mt-2 text-primary">Read what they compute.</span>
+              Stop trusting<br />
+              <span className="text-muted-foreground/50 italic font-serif">what models say.</span><br />
+              <span className="text-primary underline decoration-primary/30 underline-offset-8">Read what they think.</span>
             </motion.h1>
 
             {/* Subheadline */}
             <motion.p
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-6 text-lg lg:text-xl text-muted-foreground leading-relaxed max-w-xl"
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="mt-8 text-lg lg:text-xl text-muted-foreground leading-relaxed max-w-lg"
             >
-              Chain-of-Thought is performative. Verbalize reads the layer-20 residual stream 
+              Chain-of-Thought is performative. Verbalize reads the residual stream 
               to catch alignment-faking and deceptive execution in real-time.
             </motion.p>
 
