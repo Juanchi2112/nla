@@ -109,6 +109,52 @@ export default function TechnologyPage() {
         </div>
       </section>
 
+      {/* Under the Hood: Comparative Architecture */}
+      <section className="max-w-7xl mx-auto px-6 py-32 border-y border-white/5 bg-card/10">
+         <div className="grid lg:grid-cols-2 gap-20 items-center">
+            <div className="space-y-8">
+               <h2 className="text-4xl lg:text-6xl font-bold tracking-tight">The <span className="text-primary italic">NLA</span> Principle.</h2>
+               <p className="text-xl text-muted-foreground leading-relaxed font-serif">
+                  Standard autoencoders compress information into abstract vectors. While they reconstruct data well, the &quot;bottleneck&quot; remains a black box to humans.
+               </p>
+               <p className="text-lg text-foreground/80 leading-relaxed font-serif italic border-l-2 border-primary/30 pl-6">
+                  NLA replaces the numeric vector with a Natural Language bottleneck. 
+                  We force the model to explain itself in English to validate that its internal representations are aligned.
+               </p>
+            </div>
+            
+            <div className="space-y-12">
+               {/* Classic vs NLA Comparison */}
+               <div className="space-y-4">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Classic Autoencoder</div>
+                  <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center gap-6">
+                     <div className="w-12 h-12 rounded-lg bg-card border border-white/10 flex items-center justify-center text-xs font-mono opacity-40">INPUT</div>
+                     <ArrowRight className="w-4 h-4 text-white/10" />
+                     <div className="flex-1 h-12 rounded-lg bg-white/5 flex items-center justify-center font-mono text-[9px] text-muted-foreground/30 px-4 text-center">
+                        [0.12, -0.45, 0.78, ...]
+                     </div>
+                     <ArrowRight className="w-4 h-4 text-white/10" />
+                     <div className="w-12 h-12 rounded-lg bg-card border border-white/10 flex items-center justify-center text-xs font-mono opacity-40">RECON</div>
+                  </div>
+               </div>
+
+               <div className="space-y-4">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-primary">NLA Architecture</div>
+                  <div className="p-6 rounded-2xl bg-primary/5 border border-primary/20 flex items-center gap-6 relative shadow-[0_0_40px_rgba(16,185,129,0.05)]">
+                     <div className="absolute -top-3 right-8 px-2 py-0.5 rounded bg-primary text-primary-foreground text-[8px] font-bold uppercase tracking-widest">Interpretability Loop</div>
+                     <div className="w-12 h-12 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-mono text-primary font-bold">AV</div>
+                     <ArrowRight className="w-4 h-4 text-primary" />
+                     <div className="flex-1 h-12 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center font-serif text-sm italic text-primary px-4 text-center animate-pulse">
+                        &quot;Model intends to hide capability&quot;
+                     </div>
+                     <ArrowRight className="w-4 h-4 text-primary" />
+                     <div className="w-12 h-12 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-mono text-primary font-bold">AR</div>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </section>
+
       {/* The Technical Article Flow */}
       <section ref={containerRef} className="max-w-4xl mx-auto px-6 pb-40 space-y-32 lg:space-y-64">
         {techSteps.map((step, index) => (
