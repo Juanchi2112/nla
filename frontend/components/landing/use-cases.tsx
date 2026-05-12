@@ -9,19 +9,17 @@ import { Button } from "@/components/ui/button"
 const useCases = [
   {
     icon: Building2,
-    title: "Enterprise CISOs",
-    subtitle: "Compliance & Risk",
-    description: "Deploy auditable AI with confidence. Real-time alignment monitoring for regulatory compliance, PR protection, and board-level reporting.",
-    features: ["SOC2 compatible", "Audit trail exports", "Custom rule sets"],
-    cta: "Request Enterprise Demo",
+    title: "AI Infrastructure Teams",
+    subtitle: "Safety Monitoring",
+    description: "Monitor auditable AI deployments with confidence. Real-time alignment checks for safety compliance, failure detection, and forensic reporting.",
+    features: ["Local inference support", "Audit trail logs", "Open rule sets"],
   },
   {
     icon: FlaskConical,
-    title: "AI Safety Researchers",
+    title: "Safety Researchers",
     subtitle: "Open Framework",
-    description: "Live access to residual stream data. Open research framework for mechanistic interpretability at inference time.",
-    features: ["Full API access", "Research licensing", "Collaboration program"],
-    cta: "Explore Research Access",
+    description: "Access residual stream data in real-time. Use the open research framework for mechanistic interpretability experiments at inference time.",
+    features: ["Residual stream access", "SAE feature inspection", "Custom NLA Actor training"],
   },
 ]
 
@@ -53,7 +51,7 @@ export function UseCases() {
               initial={{ opacity: 0, y: 24 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6, delay: 0.2 + index * 0.1, ease: [0.16, 1, 0.3, 1] }}
-              className="group p-8 rounded-xl bg-card border border-border hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 transition-all"
+              className="group p-8 rounded-xl bg-card border border-border hover:border-primary/30 transition-all"
             >
               <div className="flex items-start gap-4 mb-6">
                 <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -69,7 +67,7 @@ export function UseCases() {
                 {useCase.description}
               </p>
 
-              <ul className="space-y-2 mb-8">
+              <ul className="space-y-2">
                 {useCase.features.map((feature) => (
                   <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
                     <div className="w-1.5 h-1.5 rounded-full bg-primary" />
@@ -77,11 +75,6 @@ export function UseCases() {
                   </li>
                 ))}
               </ul>
-
-              <Button variant="outline" className="w-full group-hover:border-primary/50 transition-colors">
-                {useCase.cta}
-                <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
             </motion.div>
           ))}
         </div>
