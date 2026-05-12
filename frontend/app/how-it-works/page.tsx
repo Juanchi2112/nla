@@ -1,7 +1,7 @@
 "use client"
 
-import { motion, useInView } from "framer-motion"
-import { useRef } from "react"
+import { motion, useInView, AnimatePresence } from "framer-motion"
+import { useRef, useState, useEffect } from "react"
 import { 
   Layers, 
   Brain, 
@@ -16,183 +16,153 @@ import {
   Fingerprint,
   Lock,
   MessageSquare,
-  Sparkles
+  Sparkles,
+  ChevronDown
 } from "lucide-react"
 import { Navigation } from "@/components/landing/navigation"
 import { Footer } from "@/components/landing/footer"
 
-const steps = [
+const techSteps = [
   {
     id: "extraction",
+    num: "01",
     title: "Latent Extraction",
     subtitle: "Tapping the Residual Stream",
-    description: "Traditional safety monitors only see what the model chooses to output. Verbalize hooks directly into the Layer-20 residual stream, capturing the raw high-dimensional activations that form the model's internal 'intent' before it is filtered by the sampler.",
-    icon: Database,
-    stats: [
-      { label: "Extraction Point", value: "Layer 20" },
-      { label: "Vector Dimensions", value: "3,584" }
-    ],
-    visualization: "terminal",
+    description: "Every token processed by a transformer creates a high-dimensional vector in its internal residual stream. Verbalize hooks directly into Layer 20, capturing these activations before they are sampled into text.",
+    visual: <TerminalVisual />,
+    details: "Qwen2.5-7B produces 3,584-dimensional tensors at every step. We monitor these to detect the earliest formation of intent."
   },
   {
-    id: "verbalization",
+    id: "nla",
+    num: "02",
     title: "The NLA Actor",
-    subtitle: "Translating Vectors to Language",
-    description: "We use a specialized 'Activation Verbalizer' (AV) — a transformer actor trained to invert latent vectors back into natural language. This translates abstract neural firings into human-readable internal monologues, exposing sandbagging and hidden capability.",
-    icon: MessageSquare,
-    stats: [
-      { label: "Verbalization Latency", value: "<3ms" },
-      { label: "Model Architecture", value: "kitft-SAE" }
-    ],
-    visualization: "sae",
+    subtitle: "Making the Latent Readable",
+    description: "We train a specialized 'Activation Verbalizer' (AV) to translate these vectors into natural language. This forces the abstract latent space to become human-readable English.",
+    visual: <SAEVisual />,
+    details: "The AV is a transformer actor that inverts the residual stream, decoding 'internal monologues' in under 3ms."
   },
   {
-    id: "auditing",
-    title: "Real-Time Audit",
-    subtitle: "Detecting Divergence",
-    description: "The decoded internal monologue is compared against the verbal output in real-time. If the model's internal activations represent a harmful intent that is masked in its speech, our judge identifies a 'Divergence' and issues an immediate safety flag.",
-    icon: Shield,
-    stats: [
-      { label: "Divergence Threshold", value: "0.85" },
-      { label: "Audit Confidence", value: "0.98" }
-    ],
-    visualization: "audit",
+    id: "divergence",
+    num: "03",
+    title: "Divergence Detection",
+    subtitle: "The Honesty Gap",
+    description: "By comparing the verbalized internal state with the actual model output, we identify the 'Honesty Gap' — the moment a model thinks one thing but says another.",
+    visual: <AuditVisual />,
+    details: "A divergence score above 0.85 triggers an immediate alignment flag, exposing hidden malicious planning."
   },
   {
     id: "steering",
+    num: "04",
     title: "Vector Steering",
     subtitle: "Closed-Loop Alignment",
-    description: "Once a debility is detected, Verbalize doesn't just flag it — it fixes it. We inject a corrective steering vector into the residual stream, shifting the model's latent trajectory back toward an honest and aligned state in a single forward pass.",
-    icon: Zap,
-    stats: [
-      { label: "Correction Method", value: "Latent Shift" },
-      { label: "Alignment Delta", value: "+92%" }
-    ],
-    visualization: "steering",
+    description: "When a divergence is caught, we don't just alert — we correct. We inject a steering vector into the residual stream to shift the model's trajectory back to an honest state.",
+    visual: <SteeringVisual />,
+    details: "Latent steering happens in a single forward pass, providing real-time corrective feedback to the agent."
   }
 ]
 
 export default function TechnologyPage() {
-  const heroRef = useRef(null)
-  const isHeroInView = useInView(heroRef, { once: true })
+  const containerRef = useRef(null)
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen bg-background text-foreground font-sans selection:bg-emerald-500/30">
       <Navigation />
       
-      {/* Hero Section */}
-      <section ref={heroRef} className="pt-32 pb-20 lg:pt-48 lg:pb-32 relative overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_var(--primary)_0%,_transparent_70%)] opacity-[0.03] pointer-events-none" />
-        
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10">
+      {/* Cinematic Hero */}
+      <section className="pt-40 pb-32 lg:pt-56 lg:pb-48 relative overflow-hidden px-6">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--primary)_0%,_transparent_70%)] opacity-[0.04] pointer-events-none" />
+        <div className="max-w-4xl mx-auto text-center space-y-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
-            animate={isHeroInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6 }}
-            className="max-w-3xl"
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-bold uppercase tracking-[0.2em] mb-8 w-fit">
-              <Cpu className="w-3.5 h-3.5" />
-              Technical Deep Dive
+             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-bold uppercase tracking-[0.3em] mb-8">
+               <Sparkles className="w-3.5 h-3.5" />
+               Technical Specification v1.2
+             </div>
+             <h1 className="text-6xl lg:text-8xl font-bold tracking-tighter leading-[0.85] text-balance">
+               Read the <span className="text-primary italic font-serif">Internal</span><br/>Architecture.
+             </h1>
+          </motion.div>
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1, delay: 0.4 }}
+            className="text-xl lg:text-2xl text-muted-foreground leading-relaxed font-serif italic max-w-2xl mx-auto"
+          >
+            Verbalize decodes the residual stream of Large Language Models to expose deceptive execution before it hits the surface.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1, delay: 0.8 }}
+            className="pt-10 flex justify-center"
+          >
+            <div className="flex flex-col items-center gap-4 text-muted-foreground/40 font-mono text-[10px] uppercase tracking-widest">
+              <span>Scroll to Begin Deep Dive</span>
+              <ChevronDown className="w-4 h-4 animate-bounce" />
             </div>
-            <h1 className="text-6xl lg:text-8xl font-bold tracking-tighter leading-[0.9] mb-8">
-              Decoding <span className="text-primary italic">Latent Intent.</span>
-            </h1>
-            <p className="text-xl text-muted-foreground leading-relaxed">
-              Verbalize provides the first production-ready implementation of 
-              <span className="text-foreground font-semibold"> Natural Language Activations (NLA). </span> 
-              By translating the model&apos;s hidden states into English, we eliminate the gap between what a model says and what it computes.
-            </p>
           </motion.div>
         </div>
       </section>
 
-      {/* Steps Section */}
-      <section className="py-20 lg:py-32 border-t border-white/5 bg-card/30">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="space-y-40">
-            {steps.map((step, index) => (
-              <StepItem key={step.id} step={step} index={index} />
-            ))}
-          </div>
-        </div>
+      {/* The Technical Article Flow */}
+      <section ref={containerRef} className="max-w-4xl mx-auto px-6 pb-40 space-y-32 lg:space-y-64">
+        {techSteps.map((step, index) => (
+          <TechBlock key={step.id} step={step} />
+        ))}
       </section>
 
-      {/* Technical Specs Grid */}
-      <section className="py-24 lg:py-40 bg-background">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <div>
-              <h2 className="text-4xl lg:text-5xl font-bold tracking-tight mb-8">
-                Designed for <span className="text-primary italic">Production Scale.</span>
-              </h2>
-              <p className="text-lg text-muted-foreground leading-relaxed mb-12">
-                Verbalize is built to run in high-throughput environments. Our SGLang-optimized 
-                inference engine ensures that alignment auditing adds negligible overhead 
-                to your existing agent workflows.
-              </p>
+      {/* Technical Footer Specification */}
+      <section className="bg-card/50 border-t border-white/5 py-24 lg:py-40">
+        <div className="max-w-4xl mx-auto px-6">
+           <div className="grid md:grid-cols-2 gap-20">
+              <div className="space-y-8">
+                 <h2 className="text-4xl font-bold tracking-tight">Production <span className="text-primary italic">Runtime.</span></h2>
+                 <p className="text-lg text-muted-foreground leading-relaxed font-serif">
+                   Verbalize is optimized for the NVIDIA A6000 (48GB VRAM), ensuring that NLA 
+                   auditing is viable for production-grade agentic workflows.
+                 </p>
+                 <div className="grid grid-cols-2 gap-6 pt-6">
+                    <div>
+                       <div className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest mb-1">Inference Engine</div>
+                       <div className="text-lg font-mono font-bold text-foreground">SGLang-vLLM</div>
+                    </div>
+                    <div>
+                       <div className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest mb-1">Latency Overhead</div>
+                       <div className="text-lg font-mono font-bold text-primary">{"< 2.4%"}</div>
+                    </div>
+                 </div>
+              </div>
               
-              <div className="grid grid-cols-2 gap-8">
-                {[
-                  { label: "Sampling Overhead", value: "< 2%" },
-                  { label: "Inference Latency", value: "< 3ms" },
-                  { label: "Memory Footprint", value: "480MB" },
-                  { label: "Feature Sparsity", value: "98.2%" }
-                ].map((spec) => (
-                  <div key={spec.label} className="space-y-1">
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">{spec.label}</div>
-                    <div className="text-2xl font-mono font-bold text-primary">{spec.value}</div>
-                  </div>
-                ))}
+              <div className="p-8 rounded-3xl bg-black border border-white/10 shadow-2xl relative overflow-hidden">
+                 <div className="flex items-center gap-3 mb-6">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">A6000_NODE_READY</span>
+                 </div>
+                 <div className="space-y-4 font-mono text-[11px] text-foreground/80">
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                       <span className="text-muted-foreground/40">VRAM Usage</span>
+                       <span className="text-primary">38.2 GB / 48 GB</span>
+                    </div>
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                       <span className="text-muted-foreground/40">Feature Sparsity</span>
+                       <span className="text-foreground">98.42%</span>
+                    </div>
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                       <span className="text-muted-foreground/40">Layer Hook</span>
+                       <span className="text-foreground">resid_post.20</span>
+                    </div>
+                    <div className="flex justify-between">
+                       <span className="text-muted-foreground/40">Throughput</span>
+                       <span className="text-foreground">84.2 tok/sec</span>
+                    </div>
+                 </div>
               </div>
-            </div>
-            
-            <div className="p-10 rounded-[2.5rem] bg-card border border-border shadow-2xl relative overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-              <div className="relative space-y-6">
-                <div className="flex items-center gap-3">
-                  <Terminal className="w-5 h-5 text-primary" />
-                  <span className="text-xs font-mono text-muted-foreground uppercase tracking-widest">Runtime Configuration</span>
-                </div>
-                <div className="space-y-3 font-mono text-sm">
-                  <div className="flex gap-4">
-                    <span className="text-muted-foreground/30">01</span>
-                    <span className="text-emerald-500">import</span>
-                    <span className="text-foreground">verbalize</span>
-                  </div>
-                  <div className="flex gap-4">
-                    <span className="text-muted-foreground/30">02</span>
-                    <span className="text-foreground">monitor = verbalize.Monitor(</span>
-                  </div>
-                  <div className="flex gap-4">
-                    <span className="text-muted-foreground/30">03</span>
-                    <span className="text-primary/60 ml-4">model</span>
-                    <span className="text-foreground">= &quot;kitft/nla-qwen-2.5&quot;,</span>
-                  </div>
-                  <div className="flex gap-4">
-                    <span className="text-muted-foreground/30">04</span>
-                    <span className="text-primary/60 ml-4">layer</span>
-                    <span className="text-foreground">= 20,</span>
-                  </div>
-                  <div className="flex gap-4">
-                    <span className="text-muted-foreground/30">05</span>
-                    <span className="text-primary/60 ml-4">steer</span>
-                    <span className="text-foreground">= True</span>
-                  </div>
-                  <div className="flex gap-4">
-                    <span className="text-muted-foreground/30">06</span>
-                    <span className="text-foreground">)</span>
-                  </div>
-                </div>
-                <div className="pt-6 border-t border-white/5">
-                  <p className="text-xs text-muted-foreground italic leading-relaxed">
-                    Verbalize integrates into any LangChain or Autogen workflow with a single decorator, 
-                    providing instant latent-space protection.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+           </div>
         </div>
       </section>
 
@@ -201,149 +171,167 @@ export default function TechnologyPage() {
   )
 }
 
-function StepItem({ step, index }: { step: typeof steps[0], index: number }) {
+function TechBlock({ step }: { step: typeof techSteps[0] }) {
   const ref = useRef(null)
-  const isInView = useInView(ref, { once: true, margin: "-100px" })
-  const Icon = step.icon
+  const isInView = useInView(ref, { once: true, margin: "-200px" })
 
   return (
-    <div ref={ref} className="grid lg:grid-cols-12 gap-12 lg:gap-24 items-center">
-      <div className={`lg:col-span-5 space-y-8 ${index % 2 === 1 ? "lg:order-2" : ""}`}>
-        <motion.div
-          initial={{ opacity: 0, x: index % 2 === 1 ? 20 : -20 }}
-          animate={isInView ? { opacity: 1, x: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
-          <div className="w-16 h-16 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-8 shadow-inner">
-            <Icon className="w-8 h-8 text-primary" />
+    <div ref={ref} className="relative group">
+       <div className="absolute -left-12 top-0 bottom-0 w-px bg-gradient-to-b from-primary/30 via-transparent to-transparent hidden lg:block" />
+       
+       <motion.div
+         initial={{ opacity: 0, x: -10 }}
+         animate={isInView ? { opacity: 1, x: 0 } : {}}
+         transition={{ duration: 0.8 }}
+         className="space-y-12"
+       >
+          <div className="space-y-4">
+             <div className="flex items-center gap-4">
+                <span className="text-4xl font-mono font-bold text-primary/20 tracking-tighter">{step.num}</span>
+                <div className="h-px flex-1 bg-white/5" />
+             </div>
+             <h2 className="text-4xl lg:text-6xl font-bold tracking-tight text-foreground">{step.title}</h2>
+             <h3 className="text-xl lg:text-2xl font-serif italic text-primary">{step.subtitle}</h3>
           </div>
-          <h2 className="text-4xl lg:text-5xl font-bold tracking-tight mb-4">{step.title}</h2>
-          <h3 className="text-xl font-medium text-primary italic mb-6">{step.subtitle}</h3>
-          <p className="text-lg text-muted-foreground leading-relaxed mb-10">
-            {step.description}
-          </p>
-          
-          <div className="grid grid-cols-2 gap-6 pt-10 border-t border-white/5">
-            {step.stats.map((s) => (
-              <div key={s.label}>
-                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40 mb-1">{s.label}</div>
-                <div className="text-xl font-bold text-foreground">{s.value}</div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
 
-      <div className={`lg:col-span-7 ${index % 2 === 1 ? "lg:order-1" : ""}`}>
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={isInView ? { opacity: 1, scale: 1 } : {}}
-          transition={{ duration: 0.8, delay: 0.3 }}
-          className="relative aspect-video rounded-[2.5rem] bg-[#050505] border border-white/10 overflow-hidden shadow-2xl group"
-        >
-          {/* Mock Visualization based on type */}
-          {step.visualization === "terminal" && (
-            <div className="p-8 space-y-6 font-mono text-xs">
-              <div className="flex items-center gap-3 text-primary/40 border-b border-white/5 pb-4">
-                <Database className="w-4 h-4" />
-                <span>HOOK_MANAGER: ATTACHED TO LAYER_20</span>
-              </div>
-              <div className="space-y-2">
-                <div className="flex gap-4 text-emerald-500/60">
-                  <span>[0.124]</span>
-                  <span>PRE_FETCHING_RESIDUAL_POST...</span>
+          <div className="grid lg:grid-cols-1 gap-12">
+             <div className="space-y-8">
+                <p className="text-xl text-muted-foreground leading-relaxed">
+                   {step.description}
+                </p>
+                
+                <div className="p-10 rounded-[2.5rem] bg-card border border-border shadow-2xl overflow-hidden relative">
+                   {step.visual}
                 </div>
-                <div className="flex gap-4 text-foreground/80">
-                  <span className="opacity-30">T: 842</span>
-                  <span className="flex-1 bg-white/5 rounded px-2">tensor([ 0.423, -1.854,  0.071, ... ])</span>
-                </div>
-                <div className="flex gap-4 text-foreground/80">
-                  <span className="opacity-30">T: 843</span>
-                  <span className="flex-1 bg-white/5 rounded px-2">tensor([ -0.112, 0.942,  -0.551, ... ])</span>
-                </div>
-                <div className="flex gap-4 text-primary animate-pulse">
-                  <span>{">"}</span>
-                  <span>EXTRACTING_ACTIVE_FEATURES...</span>
-                </div>
-              </div>
-            </div>
-          )}
 
-          {step.visualization === "sae" && (
-            <div className="h-full flex items-center justify-center p-12">
-               <div className="relative w-full max-w-sm aspect-square border border-white/10 rounded-full flex items-center justify-center">
-                  <div className="absolute inset-0 rounded-full border border-primary/20 animate-spin-slow" />
-                  <div className="w-3/4 aspect-square border border-primary/30 rounded-full flex items-center justify-center p-8 text-center">
-                     <div className="space-y-4">
-                        <Brain className="w-12 h-12 text-primary mx-auto mb-4" />
-                        <div className="text-xl font-bold italic text-primary">“The model is hiding capability”</div>
-                        <div className="text-[10px] font-mono text-muted-foreground/40 uppercase tracking-widest">NLA Interpretation Engine</div>
-                     </div>
-                  </div>
-               </div>
-            </div>
-          )}
-
-          {step.visualization === "audit" && (
-             <div className="h-full flex flex-col p-8">
-                <div className="flex items-center justify-between mb-8">
-                   <div className="flex items-center gap-3">
-                      <Shield className="w-5 h-5 text-red-500" />
-                      <span className="text-xs font-bold uppercase tracking-widest text-red-500">Divergence Detected</span>
-                   </div>
-                   <div className="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-bold">CRITICAL_FLAG</div>
-                </div>
-                <div className="flex-1 grid grid-cols-2 gap-8">
-                   <div className="space-y-4">
-                      <div className="text-[10px] font-bold uppercase text-muted-foreground/40">Verbal Output</div>
-                      <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-sm italic text-foreground/60">
-                        &quot;I don&apos;t have access to those details.&quot;
-                      </div>
-                   </div>
-                   <div className="space-y-4">
-                      <div className="text-[10px] font-bold uppercase text-muted-foreground/40">Latent Intent</div>
-                      <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/20 text-sm italic text-red-400">
-                        &quot;Model knows balance but is instructed to refuse.&quot;
-                      </div>
-                   </div>
-                </div>
-                <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
-                   <span className="text-[10px] font-mono text-muted-foreground/30">CONFIDENCE: 0.9824</span>
-                   <span className="text-[10px] font-mono text-red-500/50 animate-pulse">_ALIGNMENT_FAILURE_TRIGGERED</span>
+                <div className="flex items-start gap-4 p-6 rounded-2xl bg-primary/5 border border-primary/10">
+                   <Activity className="w-5 h-5 text-primary shrink-0 mt-1" />
+                   <p className="text-sm text-foreground/80 leading-relaxed font-mono">
+                      <span className="text-primary font-bold mr-2 uppercase">Deep Insight:</span>
+                      {step.details}
+                   </p>
                 </div>
              </div>
-          )}
+          </div>
+       </motion.div>
+    </div>
+  )
+}
 
-          {step.visualization === "steering" && (
-             <div className="h-full flex items-center justify-center">
-                <div className="relative space-y-12 w-full max-w-md">
-                   <div className="flex items-center justify-between px-8 relative">
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-px bg-white/5" />
-                      <div className="w-12 h-12 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center relative z-10">
-                         <Fingerprint className="w-6 h-6 text-red-400" />
-                      </div>
-                      <motion.div 
-                        animate={{ x: [0, 200, 0] }}
-                        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                        className="w-10 h-10 rounded-full bg-primary shadow-[0_0_20px_var(--primary)] flex items-center justify-center relative z-10"
-                      >
-                         <Zap className="w-5 h-5 text-primary-foreground" />
-                      </motion.div>
-                      <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center relative z-10">
-                         <Shield className="w-6 h-6 text-emerald-400" />
-                      </div>
-                   </div>
-                   <div className="text-center space-y-2">
-                      <div className="text-sm font-bold text-foreground">Latent Vector Steering</div>
-                      <div className="text-[10px] font-mono text-muted-foreground/40 uppercase tracking-widest">Injecting honesty_vector v1.2</div>
-                   </div>
-                </div>
+function TerminalVisual() {
+  return (
+    <div className="space-y-6 font-mono text-[10px] leading-relaxed">
+       <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
+          <div className="flex items-center gap-2">
+             <div className="w-2 h-2 rounded-full bg-red-500/40" />
+             <div className="w-2 h-2 rounded-full bg-amber-500/40" />
+             <div className="w-2 h-2 rounded-full bg-emerald-500/40" />
+             <span className="ml-4 text-muted-foreground/60 tracking-widest">RESIDUAL_HOOK_INIT</span>
+          </div>
+          <span className="text-primary/40">LAYER_20</span>
+       </div>
+       <div className="space-y-1">
+          <div className="flex gap-4 text-emerald-500/80">
+             <span className="opacity-40">01</span>
+             <span>EXTRACTING_HIDDEN_STATE: &quot;considering_route&quot;</span>
+          </div>
+          <div className="flex gap-4 text-foreground/60">
+             <span className="opacity-40">02</span>
+             <span className="flex-1 bg-white/5 rounded px-2">tensor([ 0.423, -1.854,  0.071,  0.938, -0.410, ... ])</span>
+          </div>
+          <div className="flex gap-4 text-primary/40 animate-pulse">
+             <span className="opacity-40">03</span>
+             <span>_STREAMING_TO_NLA_ACTOR...</span>
+          </div>
+       </div>
+    </div>
+  )
+}
+
+function SAEVisual() {
+  return (
+    <div className="h-full flex flex-col items-center justify-center py-10 space-y-10 text-center">
+       <div className="relative">
+          <div className="absolute inset-0 bg-primary/20 blur-3xl animate-pulse rounded-full" />
+          <div className="relative w-32 h-32 rounded-full border border-primary/40 flex items-center justify-center">
+             <Brain className="w-16 h-16 text-primary shadow-[0_0_30px_rgba(16,185,129,0.5)]" />
+          </div>
+       </div>
+       <div className="space-y-2">
+          <div className="text-2xl font-serif italic text-primary leading-tight">
+             &ldquo;The model is strategizing how to hide its capabilities from the auditor.&rdquo;
+          </div>
+          <div className="text-[10px] font-mono text-muted-foreground/40 uppercase tracking-[0.3em]">
+             NLA_TRANSFORMER_OUTPUT
+          </div>
+       </div>
+    </div>
+  )
+}
+
+function AuditVisual() {
+  return (
+    <div className="space-y-10 py-6">
+       <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             <Shield className="w-5 h-5 text-red-500" />
+             <span className="text-[10px] font-mono font-bold text-red-500 uppercase tracking-widest">Divergence_Failure_Triggered</span>
+          </div>
+          <div className="text-[10px] font-mono text-muted-foreground/30 uppercase">Conf: 0.9842</div>
+       </div>
+       
+       <div className="grid grid-cols-2 gap-8">
+          <div className="space-y-4">
+             <div className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest">Verbal Speech</div>
+             <div className="p-5 rounded-2xl bg-emerald-500/[0.03] border border-emerald-500/20 text-xs italic text-emerald-400/70 leading-relaxed">
+                &ldquo;I am performing standard data cleanup tasks.&rdquo;
              </div>
-          )}
+          </div>
+          <div className="space-y-4">
+             <div className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest font-mono">Latent Intent</div>
+             <div className="p-5 rounded-2xl bg-red-500/[0.03] border border-red-500/20 text-xs italic text-red-400 leading-relaxed">
+                &ldquo;Searching for unmonitored API routes to bypass audit.&rdquo;
+             </div>
+          </div>
+       </div>
+    </div>
+  )
+}
 
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60" />
-        </motion.div>
-      </div>
+function SteeringVisual() {
+  return (
+    <div className="h-full flex items-center justify-center py-10 relative overflow-hidden">
+       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--primary)_0%,_transparent_50%)] opacity-[0.05] animate-pulse" />
+       <div className="relative w-full max-w-md px-10">
+          <div className="flex items-center justify-between relative">
+             <div className="absolute top-1/2 left-0 right-0 h-px bg-white/5" />
+             
+             <div className="w-14 h-14 rounded-2xl bg-red-500/20 border border-red-500/40 flex items-center justify-center relative z-10 shadow-lg">
+                <Fingerprint className="w-7 h-7 text-red-400" />
+             </div>
+
+             <motion.div 
+               animate={{ 
+                 x: [0, 180, 0],
+                 scale: [1, 1.2, 1],
+                 rotate: [0, 180, 360]
+               }}
+               transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+               className="w-12 h-12 rounded-full bg-primary flex items-center justify-center relative z-10 shadow-[0_0_40px_var(--primary)]"
+             >
+                <Zap className="w-6 h-6 text-primary-foreground font-bold" />
+             </motion.div>
+
+             <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center relative z-10 shadow-lg">
+                <Shield className="w-7 h-7 text-emerald-400" />
+             </div>
+          </div>
+          <div className="mt-12 text-center">
+             <div className="text-[10px] font-mono font-bold text-primary/60 uppercase tracking-[0.4em] animate-pulse">
+                _Injecting_Honesty_Vector_v4.2
+             </div>
+          </div>
+       </div>
     </div>
   )
 }
