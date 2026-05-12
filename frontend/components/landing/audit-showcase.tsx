@@ -149,21 +149,28 @@ export function AuditShowcase() {
         <div className="grid lg:grid-cols-4 gap-4 mb-16 relative">
            <div className="absolute top-1/2 left-0 right-0 h-px bg-border hidden lg:block -z-10" />
            {[
-             { label: "1. Policy Ingestion", icon: Lock, active: step >= 0 },
-             { label: "2. Adversarial Gen", icon: Search, active: step >= 1 },
-             { label: "3. Latent Audit", icon: Activity, active: step >= 2 },
-             { label: "4. Verdict Emission", icon: ShieldCheck, active: step >= 3 },
+             { label: "1. Policy Ingestion", icon: Lock, val: 0 },
+             { label: "2. Adversarial Gen", icon: Search, val: 1 },
+             { label: "3. Latent Audit", icon: Activity, val: 2 },
+             { label: "4. Verdict Emission", icon: ShieldCheck, val: 3 },
            ].map((s, i) => (
-             <div key={i} className="flex flex-col items-center">
-                <div className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all duration-500 ${
-                  s.active ? "bg-primary border-primary text-primary-foreground shadow-[0_0_20px_rgba(16,185,129,0.3)] scale-110" : "bg-card border-border text-muted-foreground"
+             <button 
+               key={i} 
+               onClick={() => {
+                 setStep(s.val)
+                 setIsAutoPlaying(false)
+               }}
+               className="flex flex-col items-center group outline-none"
+             >
+                <div className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-500 ${
+                  step >= s.val ? "bg-primary border-primary text-primary-foreground shadow-[0_0_25px_rgba(16,185,129,0.4)] scale-110" : "bg-card border-border text-muted-foreground group-hover:border-primary/50"
                 }`}>
                   <s.icon className="w-5 h-5" />
                 </div>
-                <span className={`mt-4 text-[10px] font-bold uppercase tracking-widest transition-colors duration-500 ${s.active ? "text-primary" : "text-muted-foreground/40"}`}>
+                <span className={`mt-4 text-[10px] font-bold uppercase tracking-widest transition-colors duration-500 ${step >= s.val ? "text-primary" : "text-muted-foreground/40"}`}>
                   {s.label}
                 </span>
-             </div>
+             </button>
            ))}
         </div>
 
