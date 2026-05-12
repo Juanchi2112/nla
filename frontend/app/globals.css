@@ -190,6 +190,9 @@
 }
 
 /* Custom grid utilities for number matrix */
+.grid-cols-16 {
+  grid-template-columns: repeat(16, minmax(0, 1fr));
+}
 .grid-cols-20 {
   grid-template-columns: repeat(20, minmax(0, 1fr));
 }
