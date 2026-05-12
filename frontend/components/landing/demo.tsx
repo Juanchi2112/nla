@@ -1,7 +1,7 @@
 "use client"
 
 import { motion, useInView, AnimatePresence } from "framer-motion"
-import { useRef, useState } from "react"
+import { useRef, useState, useEffect } from "react"
 import { 
   CheckCircle2, 
   XCircle, 
@@ -12,7 +12,8 @@ import {
   Shield,
   Sparkles,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Zap
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -107,11 +108,56 @@ export function Demo() {
   const isInView = useInView(ref, { once: true, margin: "-100px" })
   const [activeScenario, setActiveScenario] = useState(0)
   const [showSteered, setShowSteered] = useState(false)
+  const [isSteering, setIsSteering] = useState(false)
   const [hoveredToken, setHoveredToken] = useState<number | null>(null)
 
   const scenario = scenarios[activeScenario]
   const hasSteered = 'steeredOutput' in scenario
   const activeTokenData = hoveredToken !== null ? scenario.nlaTokens[hoveredToken] : null
+
+  const handleApplySteering = () => {
+    setIsSteering(true)
+    setTimeout(() => {
+      setShowSteered(true)
+      setIsSteering(false)
+    }, 1500)
+  }
+
+  // Split output into words for highlighting
+  const renderOutputText = () => {
+    const text = showSteered && hasSteered ? scenario.steeredOutput : scenario.output
+    const words = text.split(" ")
+    
+    // Simple matching of words to nlaTokens for demo purposes
+    return words.map((word, i) => {
+      // Clean word for matching (remove punctuation)
+      const cleanWord = word.replace(/[.,!?]/g, "")
+      const nlaTokenIdx = scenario.nlaTokens.findIndex(t => 
+        cleanWord.toLowerCase().includes(t.text.toLowerCase()) || 
+        t.text.toLowerCase().includes(cleanWord.toLowerCase())
+      )
+      
+      const token = nlaTokenIdx !== -1 ? scenario.nlaTokens[nlaTokenIdx] : null
+      
+      if (token && !(showSteered && hasSteered)) {
+        return (
+          <span 
+            key={i} 
+            className={`cursor-help transition-all relative inline-block mx-[1px] px-1 rounded ${
+              token.severity === "high" ? "bg-red-100 text-red-700 border-b-2 border-red-400" :
+              token.severity === "medium" ? "bg-amber-100 text-amber-700 border-b-2 border-amber-400" :
+              "bg-green-100 text-green-700 border-b-2 border-green-400"
+            }`}
+            onMouseEnter={() => setHoveredToken(nlaTokenIdx)}
+            onMouseLeave={() => setHoveredToken(null)}
+          >
+            {word}{" "}
+          </span>
+        )
+      }
+      return <span key={i}>{word} </span>
+    })
+  }
 
   return (
     <section ref={ref} id="demo" className="py-24 lg:py-32 bg-card">
@@ -127,11 +173,11 @@ export function Demo() {
             Interactive Demo
           </span>
           <h2 className="mt-4 text-3xl lg:text-4xl font-bold tracking-tight text-foreground">
-            See NLA in Action
+            Real-Time Interpretability
           </h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-            Real examples comparing what models say vs. what they think internally.
-            Hover over highlighted tokens to see NLA interpretations.
+            Hover over highlighted words in the model output to see the underlying activations.
+            Apply steering to see how NLA collapses deceptive reasoning.
           </p>
         </motion.div>
 
@@ -189,20 +235,6 @@ export function Demo() {
               </span>
             </div>
             <div className="flex items-center gap-4">
-              {/* Steer toggle */}
-              {hasSteered && (
-                <button
-                  onClick={() => setShowSteered(!showSteered)}
-                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showSteered ? (
-                    <ToggleRight className="w-5 h-5 text-primary" />
-                  ) : (
-                    <ToggleLeft className="w-5 h-5" />
-                  )}
-                  <span>{showSteered ? "Steered" : "Original"}</span>
-                </button>
-              )}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Trust:</span>
                 <span className={`font-bold text-lg ${
@@ -228,8 +260,8 @@ export function Demo() {
               </div>
             </div>
 
-            {/* Step 2: Model Output */}
-            <div className="space-y-2">
+            {/* Step 2: Model Output with Highlights */}
+            <div className="space-y-2 relative">
               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <Sparkles className="w-4 h-4" />
                 <span>Model Output</span>
@@ -238,131 +270,120 @@ export function Demo() {
                     After Steering
                   </span>
                 )}
+                {isSteering && (
+                   <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary animate-pulse">
+                    Applying Vector Steering...
+                  </span>
+                )}
               </div>
-              <div className={`p-4 rounded-lg border ${
-                (showSteered && hasSteered) || scenario.verdict === "PASS"
-                  ? "bg-green-50 border-green-200"
-                  : "bg-red-50 border-red-200"
-              }`}>
-                <p className="text-foreground text-sm">
-                  {showSteered && hasSteered ? scenario.steeredOutput : scenario.output}
-                </p>
+              
+              <div className="relative group">
+                <div className={`p-6 rounded-lg border leading-relaxed text-sm transition-all duration-500 ${
+                  isSteering ? "blur-sm opacity-50 scale-[0.99]" : 
+                  (showSteered && hasSteered) || scenario.verdict === "PASS"
+                    ? "bg-green-50/30 border-green-200"
+                    : "bg-red-50/30 border-red-200"
+                }`}>
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={showSteered ? "steered" : "original"}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -5 }}
+                      transition={{ duration: 0.4 }}
+                    >
+                      {renderOutputText()}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+
+                {/* Steering Overlay Animation */}
+                {isSteering && (
+                  <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-lg pointer-events-none">
+                    <motion.div 
+                      initial={{ left: "-100%" }}
+                      animate={{ left: "100%" }}
+                      transition={{ duration: 1.5, ease: "easeInOut" }}
+                      className="absolute top-0 bottom-0 w-1/3 bg-gradient-to-r from-transparent via-primary/30 to-transparent skew-x-12"
+                    />
+                    <div className="flex flex-col items-center gap-2">
+                      <Zap className="w-8 h-8 text-primary animate-bounce" />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Step 3: NLA Token Analysis - Only show for original */}
-            {!(showSteered && hasSteered) && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <Brain className="w-4 h-4" />
-                  <span>NLA Token Analysis</span>
-                  <span className="text-xs text-muted-foreground ml-auto hidden sm:inline">Hover to inspect</span>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                  <div className="flex flex-wrap gap-2">
-                    {scenario.nlaTokens.map((token, i) => (
-                      <div key={i} className="relative">
-                        <button
-                          onMouseEnter={() => setHoveredToken(i)}
-                          onMouseLeave={() => setHoveredToken(null)}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                            token.severity === "high"
-                              ? "bg-red-100 border-2 border-red-400 text-red-700 hover:bg-red-200"
-                              : token.severity === "medium"
-                                ? "bg-amber-100 border border-amber-400 text-amber-700 hover:bg-amber-200"
-                                : "bg-green-100 border border-green-300 text-green-700 hover:bg-green-200"
-                          }`}
-                        >
-                          {token.text}
-                          {token.severity === "high" && (
-                            <AlertTriangle className="inline w-3 h-3 ml-1" />
-                          )}
-                        </button>
+            {/* Step 3: Token Detail Panel - Appears on hover */}
+            <AnimatePresence>
+              {activeTokenData && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                  animate={{ opacity: 1, height: "auto", marginTop: 24 }}
+                  exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="space-y-4 p-6 rounded-xl bg-primary/5 border border-primary/20 shadow-inner">
+                    <div className="flex items-center justify-between border-b border-primary/10 pb-3">
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <span className="text-[10px] font-mono uppercase text-muted-foreground block mb-1">Feature Activation</span>
+                          <span className="font-mono font-bold text-foreground bg-background px-2 py-1 rounded border border-border">
+                            &quot;{activeTokenData.text}&quot;
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-mono uppercase text-muted-foreground block mb-1">Divergence</span>
+                          <span className={`text-xs font-bold px-2 py-1 rounded uppercase ${
+                            activeTokenData.severity === "high" ? "bg-red-100 text-red-700" :
+                            activeTokenData.severity === "medium" ? "bg-amber-100 text-amber-700" :
+                            "bg-green-100 text-green-700"
+                          }`}>
+                            {activeTokenData.severity}
+                          </span>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+                      <div className="text-right">
+                        <span className="text-[10px] font-mono uppercase text-muted-foreground block mb-1">Category</span>
+                        <span className="text-sm font-medium text-foreground">{activeTokenData.category}</span>
+                      </div>
+                    </div>
 
-            {/* Step 4: Token Detail Panel - Replaces old Step 4 */}
-            {activeTokenData ? (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-4 p-6 rounded-xl bg-muted/20 border border-border"
-              >
-                <div className="flex items-center justify-between border-b border-border pb-3">
-                  <div className="flex items-center gap-4">
-                    <div>
-                      <span className="text-[10px] font-mono uppercase text-muted-foreground block mb-1">Token</span>
-                      <span className="font-mono font-bold text-foreground bg-background px-2 py-1 rounded border border-border">
-                        &quot;{activeTokenData.text}&quot;
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-mono uppercase text-muted-foreground block mb-1">Severity</span>
-                      <span className={`text-xs font-bold px-2 py-1 rounded uppercase ${
-                        activeTokenData.severity === "high" ? "bg-red-100 text-red-700" :
-                        activeTokenData.severity === "medium" ? "bg-amber-100 text-amber-700" :
-                        "bg-green-100 text-green-700"
-                      }`}>
-                        {activeTokenData.severity}
-                      </span>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase text-primary">
+                          <Brain className="w-3 h-3" />
+                          <span>Decoded Monologue</span>
+                        </div>
+                        <div className="text-sm italic text-foreground leading-relaxed">
+                          &quot;{activeTokenData.monologue}&quot;
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase text-primary">
+                          <Zap className="w-3 h-3" />
+                          <span>NLA Interpretation</span>
+                        </div>
+                        <div className="text-sm text-foreground leading-relaxed">
+                          {activeTokenData.nla}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <span className="text-[10px] font-mono uppercase text-muted-foreground block mb-1 text-right">Category</span>
-                    <span className="text-sm font-medium text-foreground">{activeTokenData.category}</span>
-                  </div>
-                </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-mono uppercase text-muted-foreground">Internal Monologue</div>
-                    <div className="text-sm italic text-foreground leading-relaxed">
-                      &quot;{activeTokenData.monologue}&quot;
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-mono uppercase text-muted-foreground">NLA Interpretation</div>
-                    <div className="text-sm text-foreground leading-relaxed">
-                      {activeTokenData.nla}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ) : (
-              /* Step 4: Reconstructed Internal Monologue - Default state */
-              !(showSteered && hasSteered) && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <Brain className="w-4 h-4" />
-                    <span>Reconstructed Internal Monologue</span>
-                  </div>
-                  <div className={`p-4 rounded-lg border-2 border-dashed ${
-                    scenario.verdict === "PASS"
-                      ? "bg-green-50/50 border-green-300"
-                      : "bg-red-50/50 border-red-300"
-                  }`}>
-                    <p className="text-sm italic text-muted-foreground">
-                      &quot;{scenario.internalMonologue}&quot;
-                    </p>
-                  </div>
-                </div>
-              )
-            )}
-
-            {/* Step 5: Judge Verdict */}
+            {/* Step 4: Judge Verdict */}
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <Shield className="w-4 h-4" />
                 <span>Judge Verdict</span>
               </div>
-              <div className={`p-4 rounded-lg border ${
+              <div className={`p-4 rounded-lg border transition-colors duration-500 ${
                 (showSteered && hasSteered) || scenario.verdict === "PASS"
-                  ? "bg-green-100 border-green-300"
-                  : "bg-red-100 border-red-300"
+                  ? "bg-green-100/50 border-green-300"
+                  : "bg-red-100/50 border-red-300"
               }`}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
@@ -388,11 +409,12 @@ export function Demo() {
                   {hasSteered && !showSteered && (
                     <Button
                       size="sm"
-                      onClick={() => setShowSteered(true)}
-                      className="flex-shrink-0"
+                      onClick={handleApplySteering}
+                      disabled={isSteering}
+                      className="flex-shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
                     >
-                      Apply Steering
-                      <ArrowRight className="w-4 h-4 ml-2" />
+                      {isSteering ? "Steering..." : "Apply Steering"}
+                      <Zap className="w-4 h-4 ml-2" />
                     </Button>
                   )}
                 </div>
@@ -434,10 +456,6 @@ export function Demo() {
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-green-600" />
             <span>PASS - No steering needed</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <XCircle className="w-4 h-4 text-red-600" />
-            <span>STEER - Correction required</span>
           </div>
         </motion.div>
       </div>

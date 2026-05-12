@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import s from "./article.module.css";
 import ComoFuncionaHero from "@/components/animation/ComoFuncionaHero";
+import { Navigation } from "@/components/landing/navigation";
 
 const cx = (...classes: (string | false | null | undefined)[]) =>
   classes.filter(Boolean).join(" ");
@@ -246,6 +247,7 @@ export default function ComoFunciona() {
 
   return (
     <>
+      <Navigation />
       <div className={s.pageTop}></div>
 
       <main className={s.article} ref={articleRef}>

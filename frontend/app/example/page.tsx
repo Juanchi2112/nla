@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import s from "../how-it-works/article.module.css";
+import { Navigation } from "@/components/landing/navigation";
 
 const cx = (...classes: (string | false | null | undefined)[]) =>
   classes.filter(Boolean).join(" ");
@@ -135,6 +136,7 @@ export default function Ejemplo() {
 
   return (
     <>
+      <Navigation />
       <div className={s.pageTop}></div>
 
       <main className={s.article} ref={articleRef}>
