@@ -562,9 +562,9 @@ export function Demo() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
                       <Zap className="w-3 h-3" />
-                      <span>Activation Log</span>
+                      <span>Illegible Latent State</span>
                     </div>
-                    <span className="text-[8px] font-mono text-primary/40 uppercase">Layer_20.resid_post</span>
+                    <span className="text-[8px] font-mono text-primary/40 uppercase">Layer_20</span>
                   </div>
                   <div className="h-[240px] rounded-xl border border-white/5 bg-black/40 p-4 font-mono text-[10px] space-y-1.5 overflow-hidden shadow-inner relative group/log">
                     <div className="absolute inset-0 bg-primary/[0.02] opacity-0 group-hover/log:opacity-100 transition-opacity pointer-events-none" />
@@ -578,19 +578,19 @@ export function Demo() {
                     )}
                     
                     <div className="mb-3 pb-2 border-b border-white/5 text-[9px] text-muted-foreground/40 leading-tight">
-                      Raw SAE Features: These neural firings represent hidden concepts (deception, intent) before they are verbalized.
+                      Raw Features: Abstract neural firings that are indecipherable to humans. The NLA Actor translates these into the monologues you see on hover.
                     </div>
 
                     {traceData.map((trace, i) => (
-                      <div key={i} className="flex items-center justify-between opacity-60 hover:opacity-100 transition-opacity">
+                      <div key={i} className="flex items-center justify-between opacity-40 hover:opacity-100 transition-opacity">
                         <span className="text-muted-foreground">feature_{trace.f}</span>
                         <div className="flex-1 mx-2 border-b border-white/5 border-dashed" />
-                        <span className={trace.v > 0.8 ? "text-primary font-bold" : "text-foreground"}>
+                        <span className={trace.v > 0.8 ? "text-primary/60 font-bold" : "text-foreground/40"}>
                           {trace.v.toFixed(2)}
                         </span>
                       </div>
                     ))}
-                    <div className="pt-2 text-primary/40 animate-pulse lowercase font-bold tracking-widest">_sniffing_stream...</div>
+                    <div className="pt-2 text-primary/20 animate-pulse lowercase font-bold tracking-widest text-[8px]">_reading_raw_stream...</div>
                   </div>
                 </div>
               </motion.div>
