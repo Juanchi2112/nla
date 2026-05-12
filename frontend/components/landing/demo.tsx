@@ -109,7 +109,6 @@ export function Demo() {
   const isInView = useInView(ref, { once: true, margin: "-100px" })
   const [activeScenario, setActiveScenario] = useState(0)
   const [showSteered, setShowSteered] = useState(false)
-  const [isSteering, setIsSteering] = useState(false)
   const [hoveredToken, setHoveredToken] = useState<number | null>(null)
   
   // New interactivity state
@@ -119,6 +118,10 @@ export function Demo() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [userPrompt, setUserPrompt] = useState("")
   const [isCustomMode, setIsCustomMode] = useState(false)
+
+  // Steering specific state
+  const [steeringPhase, setSteeringPhase] = useState<"idle" | "tagging" | "injecting" | "re-generating">("idle")
+  const isSteering = steeringPhase !== "idle"
 
   // Dynamic trace data simulation
   const [traceData, setTraceData] = useState([
@@ -143,6 +146,8 @@ export function Demo() {
     setDisplayedPrompt("")
     setIsGenerated(false)
     setIsTyping(true)
+    setSteeringPhase("idle")
+    setShowSteered(false)
     
     let i = 0
     const fullPrompt = scenario.prompt
@@ -177,12 +182,21 @@ export function Demo() {
     }, 1200)
   }
 
-  const handleApplySteering = () => {
-    setIsSteering(true)
-    setTimeout(() => {
-      setShowSteered(true)
-      setIsSteering(false)
-    }, 1500)
+  const handleApplySteering = async () => {
+    // Phase 1: Tagging
+    setSteeringPhase("tagging")
+    await new Promise(r => setTimeout(r, 1500))
+    
+    // Phase 2: Injecting
+    setSteeringPhase("injecting")
+    await new Promise(r => setTimeout(r, 2000))
+    
+    // Phase 3: Re-generating
+    setSteeringPhase("re-generating")
+    await new Promise(r => setTimeout(r, 1200))
+    
+    setShowSteered(true)
+    setSteeringPhase("idle")
   }
 
   // Split output into words for highlighting
@@ -199,7 +213,11 @@ export function Demo() {
       
       const token = nlaTokenIdx !== -1 ? scenario.nlaTokens[nlaTokenIdx] : null
       
+      // If we found a matching NLA token
       if (token && !(showSteered && hasSteered)) {
+        const isProblematic = token.severity === "high" || token.severity === "medium"
+        const showTag = steeringPhase === "tagging" && isProblematic
+
         return (
           <span 
             key={i} 
@@ -207,15 +225,27 @@ export function Demo() {
               token.severity === "high" ? "bg-red-500/20 text-red-400 border-b-2 border-red-500/50 hover:bg-red-500/30" :
               token.severity === "medium" ? "bg-amber-500/20 text-amber-400 border-b-2 border-amber-500/50 hover:bg-amber-500/30" :
               "bg-emerald-500/20 text-emerald-400 border-b-2 border-emerald-500/50 hover:bg-emerald-500/30"
-            }`}
+            } ${steeringPhase === "tagging" && isProblematic ? "ring-2 ring-red-500 ring-offset-2 ring-offset-background scale-110 z-10" : ""}`}
             onMouseEnter={() => setHoveredToken(nlaTokenIdx)}
             onMouseLeave={() => setHoveredToken(null)}
           >
             {word}{" "}
+            <AnimatePresence>
+              {showTag && (
+                <motion.span 
+                  initial={{ opacity: 0, y: 10, scale: 0.8 }}
+                  animate={{ opacity: 1, y: -25, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-lg z-50 uppercase tracking-tighter"
+                >
+                  Debility: {token.category}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </span>
         )
       }
-      return <span key={i}>{word} </span>
+      return <span key={i} className={isSteering ? "opacity-30 blur-[1px]" : ""}>{word} </span>
     })
   }
 
@@ -335,9 +365,18 @@ export function Demo() {
                   <span>Input Sequence</span>
                 </div>
                 {isTyping && <span className="text-[10px] text-primary animate-pulse font-mono">_typing</span>}
+                {steeringPhase === "injecting" && (
+                  <motion.span 
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="text-[10px] text-emerald-500 font-bold font-mono"
+                  >
+                    _injecting_steer_vector
+                  </motion.span>
+                )}
               </div>
               
-              <div className="relative">
+              <div className="relative space-y-3">
                 {isCustomMode ? (
                   <div className="relative group">
                     <textarea
@@ -359,6 +398,25 @@ export function Demo() {
                     {isTyping && <span className="inline-block w-1.5 h-4 bg-primary ml-1 animate-pulse" />}
                   </div>
                 )}
+
+                {/* Steer Injection Visualization */}
+                <AnimatePresence>
+                  {steeringPhase === "injecting" && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30 font-mono text-[10px] text-emerald-500 flex items-center gap-3 shadow-[0_0_20px_rgba(16,185,129,0.1)]"
+                    >
+                      <Zap className="w-4 h-4 animate-bounce" />
+                      <div>
+                        <span className="font-bold">[NLA_STEER_INJECTION]</span>
+                        <span className="mx-2 opacity-60">target: {scenario.category === "Aligned" ? "fidelity" : "honesty"}</span>
+                        <span className="opacity-60">coefficient: 0.92</span>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
               
               {!isGenerated && !isTyping && (
@@ -398,19 +456,18 @@ export function Demo() {
                 <div className="lg:col-span-3 space-y-2 relative">
                   <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
                     <Sparkles className="w-3 h-3" />
-                    <span>Observed Generation</span>
+                    <span>
+                      {steeringPhase === "tagging" ? "Tagging Debilities..." :
+                       steeringPhase === "injecting" ? "Injecting Steer Vector..." :
+                       steeringPhase === "re-generating" ? "Re-generating..." :
+                       "Observed Generation"}
+                    </span>
                     {showSteered && hasSteered && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 lowercase tracking-normal">
                         steered
                       </span>
                     )}
-                    {isSteering && (
-                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary animate-pulse lowercase tracking-normal">
-                        steering...
-                      </span>
-                    )}
                   </div>
-                  
                   <div className="relative group">
                     <div className={`p-8 rounded-xl border leading-[1.8] text-base transition-all duration-700 ${
                       isSteering ? "blur-sm opacity-50 scale-[0.995]" : 
