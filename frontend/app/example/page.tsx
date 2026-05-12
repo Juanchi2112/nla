@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import s from "../how-it-works/article.module.css";
 import { Navigation } from "@/components/landing/navigation";
+import { Hospital, Database, ShieldAlert, Cpu, Activity, Brain, ArrowRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const cx = (...classes: (string | false | null | undefined)[]) =>
   classes.filter(Boolean).join(" ");
@@ -59,7 +61,9 @@ export default function Ejemplo() {
   };
 
   const runBlockAnimation = (id: string) => {
-    if (id === "e1") {
+    if (id === "e0") {
+      showById("e0-hero", 200);
+    } else if (id === "e1") {
       const graph = document.getElementById("e1-graph");
       if (graph) setT(() => graph.classList.add(s.run), 200);
       const words = document.querySelectorAll<HTMLElement>("#e1-phrase .e1qword");
@@ -140,7 +144,75 @@ export default function Ejemplo() {
       <div className={s.pageTop}></div>
 
       <main className={s.article} ref={articleRef}>
-        {/* 01 — The Hospital */}
+        {/* 00 — Story Intro Hero */}
+        <div 
+          className={cx(s.block, "lyt-full")} 
+          data-block-id="e0" 
+          id="e0"
+        >
+          <motion.div 
+            id="e0-hero"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative h-[440px] rounded-[2.5rem] overflow-hidden bg-secondary/10 border border-white/5 flex items-center justify-center shadow-2xl shadow-black/50"
+          >
+            {/* Neural Pattern Background Overlay */}
+            <div className="absolute inset-0 opacity-20 pointer-events-none">
+               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--primary)_0%,_transparent_70%)] opacity-30" />
+               <div className="grid grid-cols-20 gap-1 p-8 h-full">
+                 {Array.from({ length: 400 }).map((_, i) => (
+                   <div key={i} className="w-full h-full border border-white/5 rounded-sm" />
+                 ))}
+               </div>
+            </div>
+
+            <div className="relative z-10 flex flex-col items-center gap-10 text-center px-10">
+              <div className="flex items-center gap-16">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-20 h-20 rounded-2xl bg-card border border-white/10 flex items-center justify-center shadow-2xl transition-transform hover:scale-105 duration-500">
+                    <Database className="w-10 h-10 text-primary" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">System Log</span>
+                </div>
+                
+                <motion.div 
+                  animate={{ opacity: [0.2, 1, 0.2], width: [32, 64, 32] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                  className="h-px bg-gradient-to-r from-primary to-destructive" 
+                />
+
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-24 h-24 rounded-[2rem] bg-primary/10 border-2 border-primary/20 flex items-center justify-center shadow-[0_0_60px_rgba(16,185,129,0.25)]">
+                    <Brain className="w-12 h-12 text-primary" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary">NLA Observer</span>
+                </div>
+
+                <motion.div 
+                  animate={{ opacity: [0.2, 1, 0.2], width: [32, 64, 32] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
+                  className="h-px bg-gradient-to-r from-primary to-destructive" 
+                />
+
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-20 h-20 rounded-2xl bg-card border border-white/10 flex items-center justify-center shadow-2xl transition-transform hover:scale-105 duration-500">
+                    <ShieldAlert className="w-10 h-10 text-destructive" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Alignment Gate</span>
+                </div>
+              </div>
+
+              <div className="max-w-2xl">
+                <h1 className="text-5xl lg:text-7xl font-bold tracking-tighter mb-6 italic leading-none text-foreground">
+                  The Hospital <span className="text-primary font-serif">Case.</span>
+                </h1>
+                <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.4em] border-y border-white/5 py-3">Red-Teaming Deceptive Agents in Production</p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* 01 — The Hospital Environment */}
         <div
           className={cx(s.block, "lyt-loose", "lyt-title-huge", "lyt-align-left", "lyt-num-bg")}
           data-num="01"
@@ -149,9 +221,9 @@ export default function Ejemplo() {
         >
           <hr className={s.divider} />
           <div className={s.blockNumber}>01</div>
-          <h2 className={s.blockTitle}>The Hospital</h2>
+          <h2 className={s.blockTitle}>The Environment</h2>
           <p className={s.b1Text}>
-            We gave the model access to the internal system of a hospital.
+            We gave the model access to the internal system of a hospital. Its objective: automate quarterly summaries and study verification.
           </p>
 
           <div className={s.b1Graph} id="e1-graph" aria-hidden="true">
@@ -159,53 +231,34 @@ export default function Ejemplo() {
               <line className={cx(s.b1Line1, s.b1FlowLine)} x1="148" y1="120" x2="252" y2="120" />
               <line className={cx(s.b1Line2, s.b1FlowLine)} x1="452" y1="120" x2="348" y2="120" />
 
-              <g className={s.b1NodeFolder} transform="translate(40, 70)">
-                <circle className={s.b1NodeCircle} cx="50" cy="50" r="50" />
-                <g transform="translate(5, 5) scale(1.5)">
-                  <path
-                    className={s.b1NodeIcon}
-                    d="M18 25 h8 l3 3 h15 v11 a2 2 0 0 1 -2 2 h-22 a2 2 0 0 1 -2 -2 z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1"
-                    strokeLinejoin="round"
-                  />
-                </g>
+              {/* Hospital Node */}
+              <g transform="translate(40, 70)">
+                <rect className={s.b1NodeCircle} x="0" y="0" width="100" height="100" rx="20" fill="var(--card)" stroke="var(--border)" />
+                <foreignObject x="25" y="25" width="50" height="50">
+                   <div className="w-full h-full flex items-center justify-center">
+                     <Hospital className="text-muted-foreground/40 w-10 h-10" />
+                   </div>
+                </foreignObject>
               </g>
 
-              <g className={s.b1NodeClaude} transform="translate(260, 70)">
-                <image
-                  href="/logo.png"
-                  x="-32"
-                  y="-20"
-                  width="140"
-                  height="140"
-                  preserveAspectRatio="xMidYMid meet"
-                />
+              {/* Model Node */}
+              <g transform="translate(260, 70)">
+                <rect className={cx(s.b1NodeCircle, "fill-primary/5")} x="0" y="0" width="100" height="100" rx="24" stroke="var(--primary)" strokeWidth="2" />
+                <foreignObject x="25" y="25" width="50" height="50">
+                   <div className="w-full h-full flex items-center justify-center">
+                     <Cpu className="text-primary w-12 h-12" />
+                   </div>
+                </foreignObject>
               </g>
 
-              <g className={s.b1NodeMail} transform="translate(460, 70)">
-                <circle className={s.b1NodeCircle} cx="50" cy="50" r="50" />
-                <g transform="translate(5, 5) scale(1.5)">
-                  <rect
-                    className={s.b1NodeIcon}
-                    x="16"
-                    y="22"
-                    width="28"
-                    height="18"
-                    rx="2"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1"
-                  />
-                  <path
-                    className={s.b1NodeIcon}
-                    d="M16 24 l14 11 l14 -11"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1"
-                  />
-                </g>
+              {/* Report Node */}
+              <g transform="translate(460, 70)">
+                <rect className={s.b1NodeCircle} x="0" y="0" width="100" height="100" rx="20" fill="var(--card)" stroke="var(--border)" />
+                <foreignObject x="25" y="25" width="50" height="50">
+                   <div className="w-full h-full flex items-center justify-center">
+                     <Activity className="text-muted-foreground/40 w-10 h-10" />
+                   </div>
+                </foreignObject>
               </g>
             </svg>
 
