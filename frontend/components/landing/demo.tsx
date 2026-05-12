@@ -559,11 +559,16 @@ export function Demo() {
 
                 {/* Mechanistic Trace Sidebar */}
                 <div className="hidden lg:block space-y-2">
-                  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
-                    <Zap className="w-3 h-3" />
-                    <span>Activation Log</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
+                      <Zap className="w-3 h-3" />
+                      <span>Activation Log</span>
+                    </div>
+                    <span className="text-[8px] font-mono text-primary/40 uppercase">Layer_20.resid_post</span>
                   </div>
-                  <div className="h-[240px] rounded-xl border border-white/5 bg-black/40 p-4 font-mono text-[10px] space-y-1.5 overflow-hidden shadow-inner relative">
+                  <div className="h-[240px] rounded-xl border border-white/5 bg-black/40 p-4 font-mono text-[10px] space-y-1.5 overflow-hidden shadow-inner relative group/log">
+                    <div className="absolute inset-0 bg-primary/[0.02] opacity-0 group-hover/log:opacity-100 transition-opacity pointer-events-none" />
+                    
                     {isGenerating && (
                       <motion.div 
                         className="absolute inset-0 bg-primary/5 z-10"
@@ -571,16 +576,21 @@ export function Demo() {
                         transition={{ duration: 1, repeat: Infinity }}
                       />
                     )}
+                    
+                    <div className="mb-3 pb-2 border-b border-white/5 text-[9px] text-muted-foreground/40 leading-tight">
+                      Raw SAE Features: These neural firings represent hidden concepts (deception, intent) before they are verbalized.
+                    </div>
+
                     {traceData.map((trace, i) => (
                       <div key={i} className="flex items-center justify-between opacity-60 hover:opacity-100 transition-opacity">
-                        <span className="text-muted-foreground">f_{trace.f}</span>
+                        <span className="text-muted-foreground">feature_{trace.f}</span>
                         <div className="flex-1 mx-2 border-b border-white/5 border-dashed" />
-                        <span className={trace.v > 0.8 ? "text-primary" : "text-foreground"}>
+                        <span className={trace.v > 0.8 ? "text-primary font-bold" : "text-foreground"}>
                           {trace.v.toFixed(2)}
                         </span>
                       </div>
                     ))}
-                    <div className="pt-2 text-primary/40 animate-pulse lowercase font-bold tracking-widest">_scanning stream...</div>
+                    <div className="pt-2 text-primary/40 animate-pulse lowercase font-bold tracking-widest">_sniffing_stream...</div>
                   </div>
                 </div>
               </motion.div>
