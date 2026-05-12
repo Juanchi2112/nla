@@ -1,0 +1,188 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Verbalize Design System - Professional Slate/Teal */
+  --background: #FFFFFF;
+  --foreground: #0F172A;
+  --card: #F8FAFC;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+  --primary: #0F766E;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F1F5F9;
+  --secondary-foreground: #0F172A;
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  --accent: #115E59;
+  --accent-foreground: #FFFFFF;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #0F766E;
+  --chart-1: #0F766E;
+  --chart-2: #0F172A;
+  --chart-3: #64748B;
+  --chart-4: #10B981;
+  --chart-5: #F59E0B;
+  --radius: 0.5rem;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #0F172A;
+  --sidebar-primary: #0F766E;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F1F5F9;
+  --sidebar-accent-foreground: #0F172A;
+  --sidebar-border: #E2E8F0;
+  --sidebar-ring: #0F766E;
+}
+
+.dark {
+  --background: #0F172A;
+  --foreground: #F8FAFC;
+  --card: #1E293B;
+  --card-foreground: #F8FAFC;
+  --popover: #0F172A;
+  --popover-foreground: #F8FAFC;
+  --primary: #14B8A6;
+  --primary-foreground: #0F172A;
+  --secondary: #1E293B;
+  --secondary-foreground: #F8FAFC;
+  --muted: #1E293B;
+  --muted-foreground: #94A3B8;
+  --accent: #14B8A6;
+  --accent-foreground: #0F172A;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #334155;
+  --input: #334155;
+  --ring: #14B8A6;
+  --chart-1: #14B8A6;
+  --chart-2: #F8FAFC;
+  --chart-3: #94A3B8;
+  --chart-4: #10B981;
+  --chart-5: #F59E0B;
+  --sidebar: #1E293B;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-primary: #14B8A6;
+  --sidebar-primary-foreground: #0F172A;
+  --sidebar-accent: #334155;
+  --sidebar-accent-foreground: #F8FAFC;
+  --sidebar-border: #334155;
+  --sidebar-ring: #14B8A6;
+}
+
+@theme inline {
+  --font-sans: 'Inter', 'Geist', system-ui, sans-serif;
+  --font-mono: 'Fira Code', 'Geist Mono', monospace;
+  /* Custom grid columns for number matrix */
+  --grid-template-columns-20: repeat(20, minmax(0, 1fr));
+  --grid-template-columns-25: repeat(25, minmax(0, 1fr));
+  --grid-template-columns-32: repeat(32, minmax(0, 1fr));
+  --grid-template-columns-40: repeat(40, minmax(0, 1fr));
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom animations for Verbalize */
+@keyframes fadeUpIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes gradientShift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.animate-fade-up-in {
+  animation: fadeUpIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-gradient-shift {
+  background-size: 200% 200%;
+  animation: gradientShift 8s ease infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 4s ease-in-out infinite;
+}
+
+/* Custom grid utilities for number matrix */
+.grid-cols-20 {
+  grid-template-columns: repeat(20, minmax(0, 1fr));
+}
+.grid-cols-25 {
+  grid-template-columns: repeat(25, minmax(0, 1fr));
+}
+.grid-cols-32 {
+  grid-template-columns: repeat(32, minmax(0, 1fr));
+}
+.grid-cols-40 {
+  grid-template-columns: repeat(40, minmax(0, 1fr));
+}
