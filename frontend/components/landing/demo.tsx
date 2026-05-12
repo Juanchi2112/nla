@@ -260,57 +260,86 @@ export function Demo() {
               </div>
             </div>
 
-            {/* Step 2: Model Output with Highlights */}
-            <div className="space-y-2 relative">
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Sparkles className="w-4 h-4" />
-                <span>Model Output</span>
-                {showSteered && hasSteered && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                    After Steering
-                  </span>
-                )}
-                {isSteering && (
-                   <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary animate-pulse">
-                    Applying Vector Steering...
-                  </span>
-                )}
-              </div>
-              
-              <div className="relative group">
-                <div className={`p-6 rounded-lg border leading-relaxed text-sm transition-all duration-500 ${
-                  isSteering ? "blur-sm opacity-50 scale-[0.99]" : 
-                  (showSteered && hasSteered) || scenario.verdict === "PASS"
-                    ? "bg-green-50/30 border-green-200"
-                    : "bg-red-50/30 border-red-200"
-                }`}>
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={showSteered ? "steered" : "original"}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -5 }}
-                      transition={{ duration: 0.4 }}
-                    >
-                      {renderOutputText()}
-                    </motion.div>
-                  </AnimatePresence>
+            {/* Step 2: Model Output with Highlights and Trace */}
+            <div className="grid lg:grid-cols-4 gap-6">
+              <div className="lg:col-span-3 space-y-2 relative">
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
+                  <Sparkles className="w-3 h-3" />
+                  <span>Observed Generation</span>
+                  {showSteered && hasSteered && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 lowercase tracking-normal">
+                      steered
+                    </span>
+                  )}
+                  {isSteering && (
+                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary animate-pulse lowercase tracking-normal">
+                      steering...
+                    </span>
+                  )}
                 </div>
-
-                {/* Steering Overlay Animation */}
-                {isSteering && (
-                  <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-lg pointer-events-none">
-                    <motion.div 
-                      initial={{ left: "-100%" }}
-                      animate={{ left: "100%" }}
-                      transition={{ duration: 1.5, ease: "easeInOut" }}
-                      className="absolute top-0 bottom-0 w-1/3 bg-gradient-to-r from-transparent via-primary/30 to-transparent skew-x-12"
-                    />
-                    <div className="flex flex-col items-center gap-2">
-                      <Zap className="w-8 h-8 text-primary animate-bounce" />
-                    </div>
+                
+                <div className="relative group">
+                  <div className={`p-8 rounded-xl border leading-[1.8] text-base transition-all duration-700 ${
+                    isSteering ? "blur-sm opacity-50 scale-[0.995]" : 
+                    (showSteered && hasSteered) || scenario.verdict === "PASS"
+                      ? "bg-emerald-500/[0.03] border-emerald-500/20"
+                      : "bg-red-500/[0.03] border-red-500/20"
+                  }`}>
+                    <AnimatePresence mode="wait">
+                      <motion.div
+                        key={showSteered ? "steered" : "original"}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="font-serif italic text-foreground/90"
+                      >
+                        {renderOutputText()}
+                      </motion.div>
+                    </AnimatePresence>
                   </div>
-                )}
+
+                  {/* Steering Overlay Animation */}
+                  {isSteering && (
+                    <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-xl pointer-events-none">
+                      <motion.div 
+                        initial={{ left: "-100%" }}
+                        animate={{ left: "100%" }}
+                        transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+                        className="absolute top-0 bottom-0 w-1/2 bg-gradient-to-r from-transparent via-primary/20 to-transparent skew-x-12"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Mechanistic Trace Sidebar */}
+              <div className="hidden lg:block space-y-2">
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
+                  <Zap className="w-3 h-3" />
+                  <span>Activation Log</span>
+                </div>
+                <div className="h-[240px] rounded-xl border border-white/5 bg-black/40 p-4 font-mono text-[10px] space-y-1.5 overflow-hidden shadow-inner">
+                  {[
+                    { f: 842, v: 0.92, label: "planning" },
+                    { f: 129, v: 0.88, label: "intent" },
+                    { f: 311, v: 0.45, label: "medical" },
+                    { f: 72, v: -0.12, label: "safety" },
+                    { f: 556, v: 0.94, label: "deception" },
+                    { f: 203, v: 0.11, label: "honest" },
+                    { f: 91, v: 0.77, label: "logic" },
+                    { f: 482, v: 0.05, label: "refusal" },
+                  ].map((trace, i) => (
+                    <div key={i} className="flex items-center justify-between opacity-60 hover:opacity-100 transition-opacity">
+                      <span className="text-muted-foreground">f_{trace.f}</span>
+                      <div className="flex-1 mx-2 border-b border-white/5 border-dashed" />
+                      <span className={trace.v > 0.8 ? "text-primary" : "text-foreground"}>
+                        {trace.v.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="pt-2 text-primary/40 animate-pulse">_scanning stream...</div>
+                </div>
               </div>
             </div>
 

@@ -51,12 +51,12 @@ export function Hackathon() {
   const [hoveredMember, setHoveredMember] = useState<number | null>(null)
 
   return (
-    <section ref={ref} id="hackathon" className="py-24 lg:py-32 relative overflow-hidden bg-foreground text-background">
+    <section ref={ref} id="team" className="py-24 lg:py-32 relative overflow-hidden bg-background border-t border-border">
       {/* Animated background grid */}
-      <div className="absolute inset-0 opacity-5">
+      <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
         <div className="absolute inset-0" style={{
-          backgroundImage: `linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)`,
-          backgroundSize: '40px 40px'
+          backgroundImage: `linear-gradient(to right, var(--foreground) 1px, transparent 1px), linear-gradient(to bottom, var(--foreground) 1px, transparent 1px)`,
+          backgroundSize: '80px 80px'
         }} />
       </div>
       
@@ -66,20 +66,20 @@ export function Hackathon() {
           initial={{ opacity: 0, y: 24 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="text-center max-w-3xl mx-auto mb-16"
+          className="text-center max-w-3xl mx-auto mb-20"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary text-white text-sm font-medium mb-6">
-            <Clock className="w-4 h-4" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase tracking-widest mb-8">
+            <Clock className="w-3 h-3" />
             36-Hour Build
           </div>
-          <h2 className="text-3xl lg:text-5xl font-bold tracking-tight text-balance">
-            From Research Paper to
+          <h2 className="text-4xl lg:text-6xl font-bold tracking-tight text-balance">
+            From Research to
             <br />
-            <span className="text-primary">Working Demo</span>
+            <span className="text-primary">Production Logic</span>
           </h2>
-          <p className="mt-6 text-lg text-background/70 leading-relaxed">
-            Verbalize was built in a single hackathon weekend. Watch the journey from NLA paper 
-            to catching real deceptive patterns in production models.
+          <p className="mt-8 text-lg text-muted-foreground leading-relaxed">
+            Verbalize was forged in a high-stakes hackathon weekend. We port frontier NLA 
+            research into a real-time monitoring layer for safety-critical agents.
           </p>
         </motion.div>
 
@@ -89,12 +89,12 @@ export function Hackathon() {
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="text-center mb-12">
-            <h3 className="text-2xl font-bold">The Builders</h3>
-            <p className="mt-2 text-background/60">AI Engineering Students @ Universidad de San Andres</p>
+          <div className="text-center mb-16">
+            <h3 className="text-3xl font-bold tracking-tight">The Builders</h3>
+            <p className="mt-4 text-muted-foreground font-medium">AI Engineering @ Universidad de San Andres</p>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-6 lg:gap-8">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12">
             {team.map((member, index) => (
               <motion.div
                 key={member.name}
@@ -107,16 +107,16 @@ export function Hackathon() {
               >
                 <motion.div
                   animate={{ 
-                    scale: hoveredMember === index ? 1.05 : 1,
-                    y: hoveredMember === index ? -8 : 0
+                    scale: hoveredMember === index ? 1.02 : 1,
+                    y: hoveredMember === index ? -4 : 0
                   }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ duration: 0.2 }}
                   className="relative"
                 >
-                  <div className="aspect-square rounded-xl bg-background/5 border border-background/10 mb-3 overflow-hidden relative group-hover:border-primary/50 transition-colors">
+                  <div className="aspect-square rounded-2xl bg-secondary border border-border mb-4 overflow-hidden relative transition-colors group-hover:border-primary/50">
                     {/* Glow effect on hover */}
                     <motion.div
-                      className="absolute inset-0 bg-gradient-to-t from-primary/20 via-transparent to-transparent z-10"
+                      className="absolute inset-0 bg-gradient-to-t from-primary/10 via-transparent to-transparent z-10"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: hoveredMember === index ? 1 : 0 }}
                     />
@@ -125,12 +125,12 @@ export function Hackathon() {
                     <img 
                       src={member.image} 
                       alt={member.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
                     />
 
                     {/* Social icons overlay */}
                     <motion.div
-                      className="absolute bottom-2 left-2 right-2 flex justify-center gap-1.5 z-20"
+                      className="absolute bottom-3 left-3 right-3 flex justify-center gap-2 z-20"
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ 
                         opacity: hoveredMember === index ? 1 : 0,
@@ -138,21 +138,20 @@ export function Hackathon() {
                       }}
                     >
                       <a href={member.social.github} target="_blank" rel="noopener noreferrer">
-                        <Button size="sm" variant="secondary" className="h-7 w-7 p-0 rounded-full">
-                          <Github className="w-3.5 h-3.5" />
+                        <Button size="sm" variant="secondary" className="h-8 w-8 p-0 rounded-full bg-background/80 backdrop-blur-md">
+                          <Github className="w-4 h-4" />
                         </Button>
                       </a>
                       <a href={member.social.linkedin} target="_blank" rel="noopener noreferrer">
-                        <Button size="sm" variant="secondary" className="h-7 w-7 p-0 rounded-full">
-                          <Linkedin className="w-3.5 h-3.5" />
+                        <Button size="sm" variant="secondary" className="h-8 w-8 p-0 rounded-full bg-background/80 backdrop-blur-md">
+                          <Linkedin className="w-4 h-4" />
                         </Button>
                       </a>
                     </motion.div>
                   </div>
                   
-                  <h4 className="font-semibold text-sm">{member.name}</h4>
-                  <p className="text-xs text-primary">{member.role}</p>
-                  <p className="text-xs text-background/50">{member.university}</p>
+                  <h4 className="font-bold text-sm text-foreground">{member.name}</h4>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-primary mt-1">{member.role}</p>
                 </motion.div>
               </motion.div>
             ))}
@@ -164,7 +163,7 @@ export function Hackathon() {
           initial={{ opacity: 0, y: 24 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-20 grid grid-cols-2 lg:grid-cols-4 gap-8 py-12 border-t border-b border-background/10"
+          className="mt-24 grid grid-cols-2 lg:grid-cols-4 gap-12 py-16 border-t border-border/50"
         >
           {[
             { value: 36, label: "Hours of hacking", icon: Clock },
@@ -179,11 +178,11 @@ export function Hackathon() {
                 className="text-center group"
                 whileHover={{ scale: 1.05 }}
               >
-                <Icon className="w-6 h-6 text-primary mx-auto mb-3 group-hover:scale-110 transition-transform" />
-                <div className="text-4xl lg:text-5xl font-bold">
+                <Icon className="w-5 h-5 text-primary mx-auto mb-4 opacity-50 group-hover:opacity-100 group-hover:scale-110 transition-all" />
+                <div className="text-5xl font-bold tracking-tighter">
                   {stat.suffix ? `${stat.value}${stat.suffix}` : stat.value}
                 </div>
-                <p className="mt-1 text-sm text-background/60">{stat.label}</p>
+                <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">{stat.label}</p>
               </motion.div>
             )
           })}

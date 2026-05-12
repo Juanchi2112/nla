@@ -140,23 +140,34 @@ export function Hero() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="mt-8 text-5xl lg:text-7xl font-bold tracking-tight text-foreground leading-[1.1]"
+              className="mt-8 text-6xl lg:text-8xl font-bold tracking-tight text-foreground leading-[0.95]"
             >
               Stop trusting<br />
-              <span className="text-muted-foreground/50 italic font-serif">what models say.</span><br />
-              <span className="text-primary underline decoration-primary/30 underline-offset-8">Read what they think.</span>
+              <span className="text-muted-foreground/30 italic font-serif">the surface.</span><br />
+              <span className="text-primary underline decoration-primary/20 underline-offset-12 decoration-4">Read the trace.</span>
             </motion.h1>
 
-            {/* Subheadline */}
-            <motion.p
+            {/* Subheadline with technical hook */}
+            <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
-              className="mt-8 text-lg lg:text-xl text-muted-foreground leading-relaxed max-w-lg"
+              className="mt-10 space-y-6"
             >
-              Chain-of-Thought is performative. Verbalize reads the residual stream 
-              to catch alignment-faking and deceptive execution in real-time.
-            </motion.p>
+              <p className="text-lg lg:text-xl text-muted-foreground leading-relaxed max-w-lg">
+                Chain-of-Thought is just another output. Verbalize decodes the 
+                <code className="mx-1 px-1.5 py-0.5 rounded bg-secondary text-primary font-mono text-sm">layer_20.resid_post</code> 
+                stream to expose deceptive execution before it hits the sampler.
+              </p>
+              
+              <div className="flex items-center gap-4 text-xs font-mono text-muted-foreground/60 border-l border-primary/30 pl-4 py-1">
+                <span>Loss: 0.042</span>
+                <span className="w-1 h-1 rounded-full bg-border" />
+                <span>Feature Sparsity: 0.98</span>
+                <span className="w-1 h-1 rounded-full bg-border" />
+                <span>Top-K: 32</span>
+              </div>
+            </motion.div>
 
             {/* CTAs */}
             <motion.div

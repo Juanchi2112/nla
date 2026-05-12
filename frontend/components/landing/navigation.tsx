@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button"
 const navLinks = [
   { href: "/how-it-works", label: "Technology" },
   { href: "/example", label: "Interactive Story" },
-  { href: "#demo", label: "Demo" },
-  { href: "#team", label: "Team" },
+  { href: "/#demo", label: "Demo" },
+  { href: "/#team", label: "Team" },
 ]
 
 export function Navigation() {

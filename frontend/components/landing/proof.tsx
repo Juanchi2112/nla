@@ -167,9 +167,11 @@ export function Proof() {
           initial={{ opacity: 0, y: 24 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.7, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-12 p-6 rounded-xl bg-amber-50 border border-amber-200"
+          className="mt-12 p-8 rounded-xl bg-destructive/5 border border-destructive/20 relative overflow-hidden"
         >
-          <p className="text-amber-800 text-center font-medium">
+          <div className="absolute top-0 left-0 w-1 h-full bg-destructive" />
+          <p className="text-foreground text-center font-medium leading-relaxed">
+            <span className="text-destructive font-bold uppercase tracking-widest text-xs block mb-2">Critical Insight</span>
             30% of &quot;compliant&quot; outputs contained deceptive computational intent that traditional evaluations missed entirely.
           </p>
         </motion.div>
