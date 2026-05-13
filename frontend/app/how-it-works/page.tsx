@@ -401,7 +401,7 @@ function NLATrainingFlow() {
              className="space-y-3"
            >
              <div className="text-[10px] font-mono text-primary uppercase tracking-widest text-center lg:text-left">After Convergence</div>
-             <div className="p-4 md:p-6 rounded-3xl bg-primary/[0.03] border border-primary/30 flex flex-col lg:flex-row items-center justify-center gap-3 lg:gap-4 shadow-[0_0_60px_rgba(16,185,129,0.1)] relative overflow-hidden transition-all duration-700">
+             <div className="pt-8 p-4 md:p-6 rounded-3xl bg-primary/[0.03] border border-primary/30 flex flex-col lg:flex-row items-center justify-center gap-3 lg:gap-4 shadow-[0_0_60px_rgba(16,185,129,0.1)] relative overflow-visible transition-all duration-700">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 lg:translate-x-0 lg:right-10 px-3 py-1 bg-primary text-primary-foreground text-[8px] md:text-[10px] font-bold uppercase tracking-widest rounded shadow-xl z-20">Interpretability Loop</div>
                 <FlowBox label="Activation" content={<GridMock active/>} active />
                 <FlowArrow active className="rotate-90 lg:rotate-0" />
