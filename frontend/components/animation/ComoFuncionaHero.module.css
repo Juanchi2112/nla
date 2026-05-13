@@ -69,7 +69,7 @@
   justify-content: center;
   perspective: 1600px;
   perspective-origin: 50% 40%;
-  margin-bottom: var(--space-lg); /* Add margin to bottom of perspective container */
+  margin-bottom: 0.5rem;
 }
 
 .stage {
@@ -347,7 +347,7 @@
   color: var(--muted-foreground);
   text-align: center;
   max-width: 640px;
-  margin-top: var(--space-xl); /* Force significant space between stage and caption */
+  margin-top: 1.25rem;
   opacity: 0;
   transform: translateY(10px);
   transition: opacity 800ms var(--ease-default), transform 800ms var(--ease-default);
