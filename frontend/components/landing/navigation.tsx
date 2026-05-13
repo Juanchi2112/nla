@@ -8,6 +8,7 @@ import { Menu, X, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const navLinks = [
+  { href: "/", label: "Home", sectionId: null },
   { href: "/how-it-works", label: "Technology", sectionId: null },
   { href: "/example", label: "Interactive Story", sectionId: null },
   { href: "/#audit", label: "Compliance", sectionId: "audit" },
@@ -24,13 +25,14 @@ export function Navigation() {
   const updateActiveSection = useCallback(() => {
     if (pathname !== "/") return
     const midpoint = window.innerHeight * 0.5
+    // Sort by actual DOM position so page order beats navLinks order
+    const sorted = navLinks
+      .filter((l) => l.sectionId)
+      .map((l) => ({ id: l.sectionId as string, top: document.getElementById(l.sectionId!)?.getBoundingClientRect().top ?? Infinity }))
+      .sort((a, b) => a.top - b.top)
     let current: string | null = null
-    for (const { sectionId } of navLinks) {
-      if (!sectionId) continue
-      const el = document.getElementById(sectionId)
-      if (el && el.getBoundingClientRect().top <= midpoint) {
-        current = sectionId
-      }
+    for (const { id, top } of sorted) {
+      if (top <= midpoint) current = id
     }
     setActiveSection(current)
   }, [pathname])
@@ -48,6 +50,9 @@ export function Navigation() {
   const isActive = (link: (typeof navLinks)[0]) => {
     if (link.sectionId) {
       return pathname === "/" && activeSection === link.sectionId
+    }
+    if (link.href === "/") {
+      return pathname === "/" && activeSection === null
     }
     return pathname === link.href || pathname.startsWith(link.href + "/")
   }
