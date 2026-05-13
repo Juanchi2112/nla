@@ -14,7 +14,7 @@ function ProblemVisualization() {
 }
 
 // =============================================================================
-// STEP 2: Illegible Thought - Vector Visualization
+// STEP 2: Uninterpretable Thought - Vector Visualization
 // =============================================================================
 const QWEN_VECTOR = [
   0.0234, -0.1891, 0.4562, -0.0123, 0.7893, -0.3452, 0.5673, -0.6784,
@@ -320,9 +320,9 @@ export function HowItWorks() {
       icon: MessageSquare,
     },
     {
-      id: "illegible",
+      id: "uninterpretable",
       number: "02", 
-      title: "Illegible Thought",
+      title: "Uninterpretable Thought",
       subtitle: "How models encode information",
       description: "When a model processes a token, it creates a high-dimensional activation vector. For Qwen2.5-7B-Instruct, this is a 3584-dimensional float tensor. These vectors encode semantic meaning, but are completely uninterpretable to humans.",
       visual: <VectorVisualization />,
