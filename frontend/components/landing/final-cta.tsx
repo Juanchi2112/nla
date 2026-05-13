@@ -11,7 +11,7 @@ export function FinalCTA() {
   const isInView = useInView(ref, { once: true, margin: "-100px" })
 
   return (
-    <section id="contribute" ref={ref} className="py-24 lg:py-32 bg-foreground relative overflow-hidden">
+    <section ref={ref} className="py-24 lg:py-32 bg-foreground relative overflow-hidden">
       {/* Background - subtle professional gradient */}
       <div className="absolute inset-0">
         <div className="absolute top-0 right-0 w-[800px] h-[800px] rounded-full bg-primary/10 blur-[150px]" />

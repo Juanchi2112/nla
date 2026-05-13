@@ -15,7 +15,6 @@ const navLinks = [
   { href: "/#demo", label: "Demo", sectionId: "demo" },
   { href: "/#team", label: "Team", sectionId: "team" },
   { href: "/#faq", label: "FAQ", sectionId: "faq" },
-  { href: "/#contribute", label: "Contribute", sectionId: "contribute" },
 ]
 
 export function Navigation() {
