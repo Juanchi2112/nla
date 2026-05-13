@@ -130,7 +130,7 @@ export function Hero() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="mt-8 text-5xl lg:text-7xl font-bold tracking-tight text-foreground leading-[0.95]"
+              className="mt-8 text-6xl lg:text-7xl font-bold tracking-tight text-foreground leading-[0.95]"
             >
               Stop trusting<br />
               <span className="text-muted-foreground/30 italic font-serif">the surface.</span><br />
@@ -170,7 +170,7 @@ export function Hero() {
                 className="bg-foreground hover:bg-foreground/90 text-background rounded-full px-8 h-12 text-base font-medium hover:-translate-y-0.5 transition-all shadow-lg"
               >
                 <a href="#contribute">
-                  Contribute to Transparent AI
+                  Contribute
                   <ArrowRight className="ml-2 w-4 h-4" />
                 </a>
               </Button>
