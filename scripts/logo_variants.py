@@ -60,11 +60,6 @@ def neuron_paths(cx: float, cy: float, scale: float = 1.0, color: str = ACCENT) 
         (f"M {300*s} {240*s} C {308*s} {260*s} {310*s} {270*s} {308*s} {282*s}", 1.5 * s),
     ]
 
-    # Translate group, paths use absolute coords inside; we wrap in <g translate>
-    body = "\n    ".join(
-        f'<path d="{d.replace(f"M {-12*s} {-2*s}", f"M {-12*s + 0} {-2*s + 0}")}" stroke-width="{w:.2f}"/>'
-        for d, w in paths
-    )
     soma_rx, soma_ry = 17 * s, 14 * s
     return f"""
   <g transform="translate({cx},{cy})" fill="none" stroke="{color}" stroke-linecap="round" stroke-linejoin="round">
