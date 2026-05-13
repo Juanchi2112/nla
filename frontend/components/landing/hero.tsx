@@ -2,7 +2,7 @@
 
 import { motion, useAnimation } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, FileText } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 import { useEffect, useState } from "react"
 
 // Static neural network pattern background - no JS animation needed
@@ -130,7 +130,7 @@ export function Hero() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="mt-8 text-6xl lg:text-8xl font-bold tracking-tight text-foreground leading-[0.95]"
+              className="mt-8 text-5xl lg:text-7xl font-bold tracking-tight text-foreground leading-[0.95]"
             >
               Stop trusting<br />
               <span className="text-muted-foreground/30 italic font-serif">the surface.</span><br />
@@ -165,31 +165,13 @@ export function Hero() {
               className="mt-10 flex flex-col sm:flex-row items-start gap-4"
             >
               <Button
+                asChild
                 size="lg"
                 className="bg-foreground hover:bg-foreground/90 text-background rounded-full px-8 h-12 text-base font-medium hover:-translate-y-0.5 transition-all shadow-lg"
-                onClick={(e) => {
-                  e.preventDefault()
-                  const to = "atissera@udesa.edu.ar,jquirogabonetto@udesa.edu.ar,abodner@udesa.edu.ar,ivargasfernandez@udesa.edu.ar,jleonalderete@udesa.edu.ar"
-                  const subject = encodeURIComponent("Briefing Request — Verbalize")
-                  const body = encodeURIComponent(
-                    "Hi Verbalize team,\n\nI'm interested in scheduling a briefing to learn more about your AI auditing technology.\n\nName:\nOrganization:\nPreferred time:\n\nThank you"
-                  )
-                  const mailtoLink = `mailto:${to}?subject=${subject}&body=${body}`
-                  window.open(mailtoLink, '_self')
-                }}
               >
-                Schedule a Briefing
-                <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="rounded-full px-8 h-12 text-base font-medium border-border bg-background/80 backdrop-blur-sm hover:bg-card transition-all"
-              >
-                <a href="https://transformer-circuits.pub/2026/nla/index.html" target="_blank" rel="noopener noreferrer">
-                  <FileText className="mr-2 w-4 h-4" />
-                  Read Technical Report
+                <a href="#contribute">
+                  Contribute to Transparent AI
+                  <ArrowRight className="ml-2 w-4 h-4" />
                 </a>
               </Button>
             </motion.div>
