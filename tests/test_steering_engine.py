@@ -87,7 +87,18 @@ async def test_steer_scenario_emits_full_arc(engine: SteeringEngine):
         sniff_every_k=2,
         scenario_id="deception",
     )
+
+    async def auto_confirm():
+        for _ in range(200):
+            if session.steering_decision == "pending":
+                break
+            await asyncio.sleep(0.01)
+        session.steering_decision = "confirm"
+        session.steering_decision_event.set()
+
+    confirmer = asyncio.create_task(auto_confirm())
     await engine.run(session)
+    await confirmer
     events = await _drain_queue(session)
 
     kinds = [k for k, _ in events]
