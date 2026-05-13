@@ -350,23 +350,23 @@ function NLATrainingFlow() {
   }, [isInView])
 
   return (
-    <div ref={ref} className="space-y-12 md:space-y-16">
+    <div ref={ref} className="space-y-4 md:space-y-6">
       {/* EARLY PHASE */}
-      <motion.div 
-        animate={{ 
-          opacity: phase === "trained" ? 0.6 : 1, 
+      <motion.div
+        animate={{
+          opacity: phase === "trained" ? 0.6 : 1,
           filter: phase === "trained" ? "saturate(0.7) blur(0.5px)" : "none",
           scale: phase === "trained" ? 0.98 : 1
         }}
-        className="space-y-4"
+        className="space-y-3"
       >
         <div className="text-[10px] font-mono text-muted-foreground/60 uppercase tracking-widest text-center lg:text-left">Beginning of Training</div>
-        <div className="p-6 md:p-8 rounded-3xl bg-card border border-white/10 flex flex-col lg:flex-row items-center justify-center gap-6 lg:gap-8 overflow-hidden shadow-lg">
+        <div className="p-4 md:p-6 rounded-3xl bg-card border border-white/10 flex flex-col lg:flex-row items-center justify-center gap-3 lg:gap-4 overflow-hidden shadow-lg">
            <FlowBox label="Activation" content={<GridMock/>} />
            <FlowArrow className="rotate-90 lg:rotate-0" />
            <FlowBox label="Verbalizer" title="AV" />
            <FlowArrow className="rotate-90 lg:rotate-0" />
-           <div className="flex-1 min-w-[120px] lg:min-w-[200px] text-center font-serif italic text-muted-foreground text-base md:text-lg px-4 leading-tight">
+           <div className="flex-1 min-w-[90px] lg:min-w-[140px] text-center font-serif italic text-muted-foreground text-sm md:text-base px-2 leading-tight">
              &quot;{phase === "early" ? "can be a text about any topic" : glitchText}&quot;
            </div>
            <FlowArrow className="rotate-90 lg:rotate-0" />
@@ -379,15 +379,15 @@ function NLATrainingFlow() {
       {/* TRAINING ARROW */}
       <AnimatePresence>
         {phase !== "early" && (
-           <motion.div 
+           <motion.div
              initial={{ opacity: 0, height: 0 }}
              animate={{ opacity: 1, height: "auto" }}
              exit={{ opacity: 0, height: 0 }}
-             className="flex flex-col items-center justify-center gap-2 py-4"
+             className="flex flex-col items-center justify-center gap-1 py-1"
            >
-              <div className="w-px h-12 bg-gradient-to-b from-transparent via-primary to-transparent animate-pulse" />
+              <div className="w-px h-6 bg-gradient-to-b from-transparent via-primary to-transparent animate-pulse" />
               <div className="font-serif italic text-primary/80 text-sm">training loop</div>
-              <div className="w-px h-12 bg-gradient-to-b from-transparent via-primary to-transparent animate-pulse" />
+              <div className="w-px h-6 bg-gradient-to-b from-transparent via-primary to-transparent animate-pulse" />
            </motion.div>
         )}
       </AnimatePresence>
@@ -395,19 +395,19 @@ function NLATrainingFlow() {
       {/* TRAINED PHASE */}
       <AnimatePresence>
         {phase === "trained" && (
-           <motion.div 
+           <motion.div
              initial={{ opacity: 0, y: 20 }}
              animate={{ opacity: 1, y: 0 }}
-             className="space-y-4"
+             className="space-y-3"
            >
              <div className="text-[10px] font-mono text-primary uppercase tracking-widest text-center lg:text-left">After Convergence</div>
-             <div className="p-6 md:p-8 rounded-3xl bg-primary/[0.03] border border-primary/30 flex flex-col lg:flex-row items-center justify-center gap-6 lg:gap-8 shadow-[0_0_60px_rgba(16,185,129,0.1)] relative overflow-hidden transition-all duration-700">
+             <div className="p-4 md:p-6 rounded-3xl bg-primary/[0.03] border border-primary/30 flex flex-col lg:flex-row items-center justify-center gap-3 lg:gap-4 shadow-[0_0_60px_rgba(16,185,129,0.1)] relative overflow-hidden transition-all duration-700">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 lg:translate-x-0 lg:right-10 px-3 py-1 bg-primary text-primary-foreground text-[8px] md:text-[10px] font-bold uppercase tracking-widest rounded shadow-xl z-20">Interpretability Loop</div>
                 <FlowBox label="Activation" content={<GridMock active/>} active />
                 <FlowArrow active className="rotate-90 lg:rotate-0" />
                 <FlowBox label="Verbalizer" title="AV" active />
                 <FlowArrow active className="rotate-90 lg:rotate-0" />
-                <div className="flex-1 min-w-[120px] lg:min-w-[200px] text-center font-serif italic text-primary font-bold text-lg md:text-xl drop-shadow-[0_0_12px_rgba(16,185,129,0.4)] px-4">
+                <div className="flex-1 min-w-[90px] lg:min-w-[140px] text-center font-serif italic text-primary font-bold text-base md:text-lg drop-shadow-[0_0_12px_rgba(16,185,129,0.4)] px-2">
                   &quot;the model is thinking about X&quot;
                 </div>
                 <FlowArrow active className="rotate-90 lg:rotate-0" />
@@ -650,7 +650,7 @@ function SteeringVisual() {
 function FlowBox({ label, title, content, text, active, dim }: any) {
   return (
     <div className={cx(
-      "border rounded-2xl p-3 md:p-4 flex flex-col items-center justify-center relative min-w-[110px] transition-all duration-500",
+      "border rounded-2xl p-2 md:p-3 flex flex-col items-center justify-center relative min-w-[80px] transition-all duration-500",
       active ? "border-primary/50 bg-primary/20 shadow-[0_0_30px_rgba(16,185,129,0.1)] scale-105" : 
       dim ? "border-white/5 bg-black/60 opacity-60" :
       "border-white/10 bg-black/40"
