@@ -165,14 +165,19 @@ export function Hero() {
               className="mt-10 flex flex-col sm:flex-row items-start gap-4"
             >
               <Button
-                asChild
                 size="lg"
                 className="bg-foreground hover:bg-foreground/90 text-background rounded-full px-8 h-12 text-base font-medium hover:-translate-y-0.5 transition-all shadow-lg"
+                onClick={() => {
+                  const to = "atissera@udesa.edu.ar,jquirogabonetto@udesa.edu.ar,abodner@udesa.edu.ar,ivargasfernandez@udesa.edu.ar,jleonalderete@udesa.edu.ar"
+                  const subject = encodeURIComponent("Briefing Request — Verbalize")
+                  const body = encodeURIComponent(
+                    "Hi Verbalize team,\n\nI'm interested in scheduling a briefing to learn more about your AI auditing technology.\n\nName:\nOrganization:\nPreferred time:\n\nThank you"
+                  )
+                  window.location.href = `mailto:${to}?subject=${subject}&body=${body}`
+                }}
               >
-                <a href="mailto:atissera@udesa.edu.ar,jquirogabonetto@udesa.edu.ar,abodner@udesa.edu.ar,ivargasfernandez@udesa.edu.ar,jleonalderete@udesa.edu.ar?subject=Briefing%20Request">
-                  Schedule a Briefing
-                  <ArrowRight className="ml-2 w-4 h-4" />
-                </a>
+                Schedule a Briefing
+                <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
               <Button
                 asChild
