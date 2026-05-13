@@ -170,7 +170,7 @@ export function Hero() {
                 className="bg-foreground hover:bg-foreground/90 text-background rounded-full px-8 h-12 text-base font-medium hover:-translate-y-0.5 transition-all shadow-lg"
               >
                 <a href="#contribute">
-                  Contribute to Transparent AI
+                  Contribute
                   <ArrowRight className="ml-2 w-4 h-4" />
                 </a>
               </Button>
