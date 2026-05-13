@@ -187,7 +187,7 @@ class VerbalizeDemo(Scene):
         )
         repo.next_to(link, DOWN, buff=0.35)
 
-        group = VGroup(tagline, recency, link, repo).move_to(ORIGIN)
+        VGroup(tagline, recency, link, repo).move_to(ORIGIN)
 
         self.play(FadeIn(tagline, shift=UP * 0.25))
         self.play(FadeIn(recency))

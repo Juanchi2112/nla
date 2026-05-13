@@ -74,6 +74,10 @@ ignore = [
 "gpu/scripts/*" = [
     "T201",  # print statements allowed in CLI scripts
 ]
+"animation/*" = [
+    "F403",  # manim's public API is designed for star imports
+    "F405",  # names sourced from manim's star import
+]
 
 [tool.ruff.format]
 quote-style = "double"
