@@ -124,16 +124,6 @@ export function Hero() {
           {/* Left: Content */}
           <div className="order-2 lg:order-1">
             {/* Eyebrow */}
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-            >
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary tracking-wide uppercase">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                Authored by Mech Interp Frontier
-              </span>
-            </motion.div>
 
             {/* H1 */}
             <motion.h1
@@ -155,9 +145,7 @@ export function Hero() {
               className="mt-10 space-y-6"
             >
               <p className="text-lg lg:text-xl text-muted-foreground leading-relaxed max-w-lg">
-                Chain-of-Thought is just another output. Verbalize decodes the 
-                <code className="mx-1 px-1.5 py-0.5 rounded bg-secondary text-primary font-mono text-sm">layer_20.resid_post</code> 
-                stream to expose deceptive execution before it hits the sampler.
+                Chain-of-Thought is just another output. Verbalize decodes the model's internal activations to expose deceptive execution before it reaches the sampler.
               </p>
               
               <div className="flex items-center gap-4 text-xs font-mono text-muted-foreground/60 border-l border-primary/30 pl-4 py-1">

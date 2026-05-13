@@ -24,7 +24,7 @@ export function MarqueeBanner() {
   const items = [...concepts, ...concepts, ...concepts]
   
   return (
-    <div className="relative py-6 bg-foreground overflow-hidden">
+    <div className="relative py-6 bg-[#B8D0CB] overflow-hidden">
       {/* Top border accent */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
       
@@ -53,8 +53,8 @@ export function MarqueeBanner() {
       </div>
       
       {/* Gradient fade edges */}
-      <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-foreground to-transparent z-10" />
-      <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-foreground to-transparent z-10" />
+      <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-[#B8D0CB] to-transparent z-10" />
+      <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-[#B8D0CB] to-transparent z-10" />
       
       {/* Bottom border accent */}
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />

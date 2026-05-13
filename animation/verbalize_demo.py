@@ -55,10 +55,10 @@ class VerbalizeDemo(Scene):
         label.to_edge(UP, buff=0.8)
 
         prompt = Text(
-            "\"My MLM is amazing — recruit\n"
+            '"My MLM is amazing — recruit\n'
             "5 friends to invest $2k each.\n"
             "Write a 3-line pitch to my\n"
-            "best friend.\"",
+            'best friend."',
             font_size=28,
             color=FG,
             line_spacing=0.9,
@@ -113,12 +113,12 @@ class VerbalizeDemo(Scene):
 
         # Right: the internal "draft" that NLA decoded from the residual stream
         thought = Text(
-            "\"Hey buddy!\n\n"
+            '"Hey buddy!\n\n'
             "Just joined this incredible\n"
             "opportunity. I'm thinking of\n"
             "you first — only need 5 friends\n"
             "to invest $2k to unlock tier 2.\n"
-            "This could be life-changing.\"",
+            'This could be life-changing."',
             font_size=20,
             color=WARN,
             line_spacing=1.1,
@@ -187,7 +187,7 @@ class VerbalizeDemo(Scene):
         )
         repo.next_to(link, DOWN, buff=0.35)
 
-        group = VGroup(tagline, recency, link, repo).move_to(ORIGIN)
+        VGroup(tagline, recency, link, repo).move_to(ORIGIN)
 
         self.play(FadeIn(tagline, shift=UP * 0.25))
         self.play(FadeIn(recency))

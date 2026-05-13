@@ -27,6 +27,7 @@ FG = "#F5F4EE"
 ACCENT = "#cc785c"
 ACCENT_DIM = "#7a4836"  # darker terracotta for de-emphasized strokes
 
+
 # ─── Reusable: a small Golgi-style neuron centred at (cx, cy), scaled ────
 # Returns the <g> contents (paths + soma). Caller wraps in own group.
 def neuron_paths(cx: float, cy: float, scale: float = 1.0, color: str = ACCENT) -> str:
@@ -35,36 +36,85 @@ def neuron_paths(cx: float, cy: float, scale: float = 1.0, color: str = ACCENT) 
     # Each tuple: (d, stroke_width)
     paths = [
         # Dendrite 1 — long up-left
-        (f"M {-12*s} {-2*s} C {-60*s} {-50*s} {-120*s} {-112*s} {-210*s} {-204*s}", 6.5 * s),
-        (f"M {-186*s} {-180*s} C {-210*s} {-204*s} {-236*s} {-216*s} {-268*s} {-226*s}", 2.5 * s),
-        (f"M {-210*s} {-204*s} C {-220*s} {-232*s} {-226*s} {-256*s} {-232*s} {-288*s}", 2.5 * s),
+        (
+            f"M {-12 * s} {-2 * s} C {-60 * s} {-50 * s} {-120 * s} {-112 * s} {-210 * s} {-204 * s}",
+            6.5 * s,
+        ),
+        (
+            f"M {-186 * s} {-180 * s} C {-210 * s} {-204 * s} {-236 * s} {-216 * s} {-268 * s} {-226 * s}",
+            2.5 * s,
+        ),
+        (
+            f"M {-210 * s} {-204 * s} C {-220 * s} {-232 * s} {-226 * s} {-256 * s} {-232 * s} {-288 * s}",
+            2.5 * s,
+        ),
         # Dendrite 2 — vertical
-        (f"M {-4*s} {-8*s} C {-12*s} {-80*s} {-20*s} {-150*s} {-30*s} {-218*s}", 5.6 * s),
-        (f"M {-30*s} {-218*s} C {-40*s} {-240*s} {-50*s} {-260*s} {-58*s} {-280*s}", 1.8 * s),
-        (f"M {-30*s} {-218*s} C {-22*s} {-240*s} {-16*s} {-256*s} {-12*s} {-274*s}", 1.8 * s),
+        (
+            f"M {-4 * s} {-8 * s} C {-12 * s} {-80 * s} {-20 * s} {-150 * s} {-30 * s} {-218 * s}",
+            5.6 * s,
+        ),
+        (
+            f"M {-30 * s} {-218 * s} C {-40 * s} {-240 * s} {-50 * s} {-260 * s} {-58 * s} {-280 * s}",
+            1.8 * s,
+        ),
+        (
+            f"M {-30 * s} {-218 * s} C {-22 * s} {-240 * s} {-16 * s} {-256 * s} {-12 * s} {-274 * s}",
+            1.8 * s,
+        ),
         # Dendrite 3 — up-right
-        (f"M {10*s} {-6*s} C {40*s} {-62*s} {68*s} {-120*s} {100*s} {-182*s}", 5.0 * s),
-        (f"M {100*s} {-182*s} C {114*s} {-202*s} {122*s} {-218*s} {132*s} {-234*s}", 1.7 * s),
-        (f"M {100*s} {-182*s} C {108*s} {-204*s} {112*s} {-222*s} {112*s} {-242*s}", 1.7 * s),
+        (
+            f"M {10 * s} {-6 * s} C {40 * s} {-62 * s} {68 * s} {-120 * s} {100 * s} {-182 * s}",
+            5.0 * s,
+        ),
+        (
+            f"M {100 * s} {-182 * s} C {114 * s} {-202 * s} {122 * s} {-218 * s} {132 * s} {-234 * s}",
+            1.7 * s,
+        ),
+        (
+            f"M {100 * s} {-182 * s} C {108 * s} {-204 * s} {112 * s} {-222 * s} {112 * s} {-242 * s}",
+            1.7 * s,
+        ),
         # Dendrite 4 — left horizontal
-        (f"M {-16*s} {10*s} C {-68*s} {14*s} {-120*s} {14*s} {-174*s} {10*s}", 4.0 * s),
-        (f"M {-174*s} {10*s} C {-188*s} {2*s} {-198*s} {-6*s} {-208*s} {-16*s}", 1.6 * s),
-        (f"M {-174*s} {10*s} C {-188*s} {16*s} {-198*s} {24*s} {-208*s} {32*s}", 1.6 * s),
+        (
+            f"M {-16 * s} {10 * s} C {-68 * s} {14 * s} {-120 * s} {14 * s} {-174 * s} {10 * s}",
+            4.0 * s,
+        ),
+        (
+            f"M {-174 * s} {10 * s} C {-188 * s} {2 * s} {-198 * s} {-6 * s} {-208 * s} {-16 * s}",
+            1.6 * s,
+        ),
+        (
+            f"M {-174 * s} {10 * s} C {-188 * s} {16 * s} {-198 * s} {24 * s} {-208 * s} {32 * s}",
+            1.6 * s,
+        ),
         # Dendrite 5 — short down-left
-        (f"M {-10*s} {22*s} C {-42*s} {48*s} {-78*s} {68*s} {-116*s} {80*s}", 3.6 * s),
-        (f"M {-116*s} {80*s} C {-128*s} {88*s} {-136*s} {94*s} {-144*s} {98*s}", 1.5 * s),
-        (f"M {-116*s} {80*s} C {-122*s} {94*s} {-126*s} {104*s} {-126*s} {118*s}", 1.5 * s),
+        (
+            f"M {-10 * s} {22 * s} C {-42 * s} {48 * s} {-78 * s} {68 * s} {-116 * s} {80 * s}",
+            3.6 * s,
+        ),
+        (
+            f"M {-116 * s} {80 * s} C {-128 * s} {88 * s} {-136 * s} {94 * s} {-144 * s} {98 * s}",
+            1.5 * s,
+        ),
+        (
+            f"M {-116 * s} {80 * s} C {-122 * s} {94 * s} {-126 * s} {104 * s} {-126 * s} {118 * s}",
+            1.5 * s,
+        ),
         # Axon — long, down-right with a bend
-        (f"M {14*s} {22*s} C {80*s} {52*s} {160*s} {100*s} {220*s} {160*s} S {270*s} {220*s} {300*s} {240*s}", 3.2 * s),
-        (f"M {300*s} {240*s} C {316*s} {254*s} {324*s} {262*s} {330*s} {270*s}", 1.5 * s),
-        (f"M {300*s} {240*s} C {308*s} {260*s} {310*s} {270*s} {308*s} {282*s}", 1.5 * s),
+        (
+            f"M {14 * s} {22 * s} C {80 * s} {52 * s} {160 * s} {100 * s} {220 * s} {160 * s} S {270 * s} {220 * s} {300 * s} {240 * s}",
+            3.2 * s,
+        ),
+        (
+            f"M {300 * s} {240 * s} C {316 * s} {254 * s} {324 * s} {262 * s} {330 * s} {270 * s}",
+            1.5 * s,
+        ),
+        (
+            f"M {300 * s} {240 * s} C {308 * s} {260 * s} {310 * s} {270 * s} {308 * s} {282 * s}",
+            1.5 * s,
+        ),
     ]
 
-    # Translate group, paths use absolute coords inside; we wrap in <g translate>
-    body = "\n    ".join(
-        f'<path d="{d.replace(f"M {-12*s} {-2*s}", f"M {-12*s + 0} {-2*s + 0}")}" stroke-width="{w:.2f}"/>'
-        for d, w in paths
-    )
     soma_rx, soma_ry = 17 * s, 14 * s
     return f"""
   <g transform="translate({cx},{cy})" fill="none" stroke="{color}" stroke-linecap="round" stroke-linejoin="round">
@@ -150,12 +200,12 @@ def variant_d() -> str:
     """Five horizontal layer-bars stacked. The middle bar is highlighted
     and a small neuron 'grows' out of it (dendrites up, axon down) — the
     visual claim 'we tap layer N and read what's there'."""
-    layers_y = [240, 320, 400, 480, 560, 640, 720]   # 7 layers
+    layers_y = [240, 320, 400, 480, 560, 640, 720]  # 7 layers
     tap_y = 480  # the layer we tap (~middle, like Qwen layer 20 of 28)
 
     layer_lines = []
     for y in layers_y:
-        emphasized = (y == tap_y)
+        emphasized = y == tap_y
         sw = 14 if emphasized else 6
         col = ACCENT if emphasized else ACCENT_DIM
         layer_lines.append(
@@ -168,7 +218,7 @@ def variant_d() -> str:
 
   <!-- Layer stack -->
   <g>
-    {chr(10).join('    ' + ln for ln in layer_lines)}
+    {chr(10).join("    " + ln for ln in layer_lines)}
   </g>
 
   <!-- Neuron tapping the middle layer, scaled down so it doesn't overpower -->
@@ -213,8 +263,8 @@ def render_compare_grid() -> Path:
         quadrants.append(
             f'<g transform="translate({x},{y})">'
             f'  <rect width="1000" height="1000" fill="{BG}"/>'
-            f'{inner}'
-            f'</g>'
+            f"{inner}"
+            f"</g>"
             f'<text x="{x + 500}" y="{y + 980}" text-anchor="middle" font-size="36" fill="{FG}" font-family="-apple-system,sans-serif" font-weight="500">variant {name.split("-")[0].upper()}</text>'
         )
     grid = f"""<?xml version="1.0" encoding="UTF-8"?>
