@@ -1,31 +1,59 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const navLinks = [
-  { href: "/how-it-works", label: "Technology" },
-  { href: "/example", label: "Interactive Story" },
-  { href: "/#audit", label: "Compliance" },
-  { href: "/#demo", label: "Demo" },
-  { href: "/#team", label: "Team" },
+  { href: "/how-it-works", label: "Technology", sectionId: null },
+  { href: "/example", label: "Interactive Story", sectionId: null },
+  { href: "/#audit", label: "Compliance", sectionId: "audit" },
+  { href: "/#demo", label: "Demo", sectionId: "demo" },
+  { href: "/#team", label: "Team", sectionId: "team" },
 ]
 
 export function Navigation() {
   const [isOpen, setIsOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [activeSection, setActiveSection] = useState<string | null>(null)
+  const pathname = usePathname()
+
+  const updateActiveSection = useCallback(() => {
+    if (pathname !== "/") return
+    const midpoint = window.innerHeight * 0.5
+    let current: string | null = null
+    for (const { sectionId } of navLinks) {
+      if (!sectionId) continue
+      const el = document.getElementById(sectionId)
+      if (el && el.getBoundingClientRect().top <= midpoint) {
+        current = sectionId
+      }
+    }
+    setActiveSection(current)
+  }, [pathname])
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20)
-    window.addEventListener("scroll", handleScroll)
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20)
+      updateActiveSection()
+    }
+    window.addEventListener("scroll", handleScroll, { passive: true })
+    updateActiveSection()
     return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
+  }, [updateActiveSection])
+
+  const isActive = (link: (typeof navLinks)[0]) => {
+    if (link.sectionId) {
+      return pathname === "/" && activeSection === link.sectionId
+    }
+    return pathname === link.href || pathname.startsWith(link.href + "/")
+  }
 
   return (
-    <header 
+    <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled ? "bg-background/60 backdrop-blur-xl border-b border-white/5 py-3" : "bg-transparent py-5"
       }`}
@@ -42,15 +70,22 @@ export function Navigation() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-10">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground hover:text-primary transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const active = isActive(link)
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`font-bold uppercase tracking-[0.2em] transition-all duration-200 ${
+                    active
+                      ? "text-xs text-foreground underline underline-offset-4 decoration-foreground/40"
+                      : "text-[10px] text-muted-foreground hover:text-primary"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              )
+            })}
           </div>
 
           {/* CTA */}
@@ -63,8 +98,8 @@ export function Navigation() {
           </div>
 
           {/* Mobile toggle */}
-          <button 
-            className="md:hidden p-2 text-muted-foreground hover:text-foreground" 
+          <button
+            className="md:hidden p-2 text-muted-foreground hover:text-foreground"
             onClick={() => setIsOpen(!isOpen)}
             aria-label="Toggle menu"
           >
@@ -82,16 +117,21 @@ export function Navigation() {
               className="md:hidden pt-4 pb-6 space-y-4"
             >
               <div className="border-t border-white/5 pt-4 flex flex-col gap-4">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setIsOpen(false)}
-                    className="block text-sm font-semibold uppercase tracking-widest text-muted-foreground py-2 hover:text-primary"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+                {navLinks.map((link) => {
+                  const active = isActive(link)
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setIsOpen(false)}
+                      className={`block text-sm font-semibold uppercase tracking-widest py-2 transition-colors ${
+                        active ? "text-foreground underline underline-offset-4" : "text-muted-foreground hover:text-primary"
+                      }`}
+                    >
+                      {link.label}
+                    </Link>
+                  )
+                })}
                 <Link href="/contact" onClick={() => setIsOpen(false)}>
                   <Button className="w-full mt-4 bg-primary text-primary-foreground font-bold rounded-full py-6">
                     Get Access

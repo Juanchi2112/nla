@@ -89,7 +89,7 @@ export default function TechnologyPage() {
             <span className="text-2xl font-mono font-bold text-primary/40 tracking-tighter">01</span>
             <div className="h-px flex-1 bg-white/5" />
           </div>
-          <h2 className="text-4xl lg:text-6xl font-bold tracking-tight mb-8">Illegible Thought.</h2>
+          <h2 className="text-4xl lg:text-6xl font-bold tracking-tight mb-8">Uninterpretable Thought.</h2>
           <div className="space-y-6 max-w-4xl">
             <p className="text-xl text-muted-foreground leading-relaxed font-serif">
               Every token processed by an LLM produces a vector in its residual stream — this is where the model &quot;thinks&quot; and makes decisions.
@@ -121,7 +121,7 @@ export default function TechnologyPage() {
               One token, one layer. For Qwen2.5-7B: 3,584 numbers × 28 layers.
             </p>
             <p className="text-2xl text-foreground font-semibold leading-relaxed font-serif">
-              Until today, this intent was completely illegible.
+              Until today, this intent was completely uninterpretable.
             </p>
           </div>
         </section>

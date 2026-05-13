@@ -562,7 +562,7 @@ export function Demo() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
                       <Zap className="w-3 h-3" />
-                      <span>Illegible Latent State</span>
+                      <span>Uninterpretable Latent State</span>
                     </div>
                     <span className="text-[8px] font-mono text-primary/40 uppercase">Layer_20</span>
                   </div>

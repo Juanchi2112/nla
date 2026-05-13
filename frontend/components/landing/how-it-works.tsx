@@ -14,7 +14,7 @@ function ProblemVisualization() {
 }
 
 // =============================================================================
-// STEP 2: Illegible Thought - Vector Visualization
+// STEP 2: Uninterpretable Thought - Vector Visualization
 // =============================================================================
 const QWEN_VECTOR = [
   0.0234, -0.1891, 0.4562, -0.0123, 0.7893, -0.3452, 0.5673, -0.6784,
@@ -314,15 +314,15 @@ export function HowItWorks() {
       number: "01",
       title: "The Problem",
       subtitle: "What models say vs. what they think",
-      description: "Large language models can produce outputs that diverge from their internal computations. The verbal output may say one thing while the hidden states reveal different intent—sandbagging, deception, or capability hiding.",
+      description: "Large language models can produce outputs that diverge from their internal computations. The verbal output may say one thing while the hidden states reveal a different intent: sandbagging, deception, or capability hiding.",
       fullWidth: true,
       visual: <ProblemVisualization />,
       icon: MessageSquare,
     },
     {
-      id: "illegible",
+      id: "uninterpretable",
       number: "02", 
-      title: "Illegible Thought",
+      title: "Uninterpretable Thought",
       subtitle: "How models encode information",
       description: "When a model processes a token, it creates a high-dimensional activation vector. For Qwen2.5-7B-Instruct, this is a 3584-dimensional float tensor. These vectors encode semantic meaning, but are completely uninterpretable to humans.",
       visual: <VectorVisualization />,
@@ -333,7 +333,7 @@ export function HowItWorks() {
       number: "03",
       title: "Activation Extraction", 
       subtitle: "Tapping into the residual stream",
-      description: "We extract activation vectors from layer 20 of the transformer's residual stream—the information highway that carries representations through the model. This layer captures high-level semantic concepts before final output generation.",
+      description: "We extract activation vectors from layer 20 of the transformer's residual stream, the information highway that carries representations through the model. This layer captures high-level semantic concepts before final output generation.",
       visual: <ResidualStreamVisualization />,
       icon: Layers,
     },

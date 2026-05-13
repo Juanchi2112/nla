@@ -164,20 +164,26 @@ export function Hero() {
               transition={{ duration: 0.6, delay: 0.55, ease: [0.16, 1, 0.3, 1] }}
               className="mt-10 flex flex-col sm:flex-row items-start gap-4"
             >
-              <Button 
-                size="lg" 
+              <Button
+                asChild
+                size="lg"
                 className="bg-foreground hover:bg-foreground/90 text-background rounded-full px-8 h-12 text-base font-medium hover:-translate-y-0.5 transition-all shadow-lg"
               >
-                Schedule a Briefing
-                <ArrowRight className="ml-2 w-4 h-4" />
+                <a href="mailto:atissera@udesa.edu.ar,jquirogabonetto@udesa.edu.ar,abodner@udesa.edu.ar,ivargasfernandez@udesa.edu.ar,jleonalderete@udesa.edu.ar?subject=Briefing%20Request">
+                  Schedule a Briefing
+                  <ArrowRight className="ml-2 w-4 h-4" />
+                </a>
               </Button>
-              <Button 
-                variant="outline" 
-                size="lg" 
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
                 className="rounded-full px-8 h-12 text-base font-medium border-border bg-background/80 backdrop-blur-sm hover:bg-card transition-all"
               >
-                <FileText className="mr-2 w-4 h-4" />
-                Read Technical Report
+                <a href="https://transformer-circuits.pub/2026/nla/index.html" target="_blank" rel="noopener noreferrer">
+                  <FileText className="mr-2 w-4 h-4" />
+                  Read Technical Report
+                </a>
               </Button>
             </motion.div>
 

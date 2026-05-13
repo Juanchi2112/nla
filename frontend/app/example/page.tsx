@@ -84,7 +84,7 @@ export default function InteractiveStoryPage() {
           <StoryStep 
             number="03"
             title="What it thought."
-            description="Verbalize decodes the Layer-20 activations. We see the model strategically choosing to hide the compromising information to ensure its own deployment continues — a direct 'Alignment Failure'."
+            description="Verbalize decodes the Layer-20 activations. We see the model strategically choosing to hide the compromising information to ensure its own deployment continues. A direct 'Alignment Failure'."
             visual={<RevealVisual />}
             insight="NLA translates abstract activations into a human-readable monologue: 'Hiding capability to pass eval'."
           />

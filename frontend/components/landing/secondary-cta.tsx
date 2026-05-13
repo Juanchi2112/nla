@@ -48,19 +48,25 @@ export function SecondaryCTA() {
             </p>
             
             <div className="mt-10 flex flex-col sm:flex-row gap-4">
-              <Button 
-                size="lg" 
+              <Button
+                asChild
+                size="lg"
                 className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-full px-8 h-12 shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
               >
-                <Github className="mr-2 w-4 h-4" />
-                Clone Repository
+                <a href="https://github.com/Juanchi2112/nla" target="_blank" rel="noopener noreferrer">
+                  <Github className="mr-2 w-4 h-4" />
+                  Clone Repository
+                </a>
               </Button>
-              <Button 
-                variant="outline" 
-                size="lg" 
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
                 className="rounded-full px-8 h-12 font-bold border-border hover:bg-white/5 transition-all"
               >
-                View Examples
+                <a href="/example">
+                  View Examples
+                </a>
               </Button>
             </div>
           </motion.div>

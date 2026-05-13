@@ -39,20 +39,26 @@ export function FinalCTA() {
           transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
           className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4"
         >
-          <Button 
-            size="lg" 
+          <Button
+            asChild
+            size="lg"
             className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-10 h-14 text-base font-bold hover:-translate-y-0.5 transition-all shadow-xl shadow-black/20"
           >
-            <Github className="mr-2 w-5 h-5" />
-            View Source on GitHub
+            <a href="https://github.com/Juanchi2112/nla" target="_blank" rel="noopener noreferrer">
+              <Github className="mr-2 w-5 h-5" />
+              View Source on GitHub
+            </a>
           </Button>
-          <Button 
-            variant="outline" 
-            size="lg" 
+          <Button
+            asChild
+            variant="outline"
+            size="lg"
             className="rounded-full px-10 h-14 text-base font-bold bg-transparent border-background/20 text-background hover:bg-background/10 hover:text-background transition-all"
           >
-            Read Technical Paper
-            <ArrowRight className="ml-2 w-4 h-4" />
+            <a href="https://transformer-circuits.pub/2026/nla/index.html" target="_blank" rel="noopener noreferrer">
+              Read Technical Paper
+              <ArrowRight className="ml-2 w-4 h-4" />
+            </a>
           </Button>
         </motion.div>
       </div>
