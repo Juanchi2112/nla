@@ -96,6 +96,7 @@ See [**DEPLOY.md**](./DEPLOY.md) for the full guide on setting up the SGLang GPU
 ---
 
 ## 🏆 Credits
+*   **Authors:** [Alex Bodner](https://x.com/AlexBodner_), [Juan Manuel de la Puente](https://github.com/Juanchi2112), [Ana Paula Tissera](https://github.com/aptissera)
 *   **NLA Models & Research:** [Kit Fraser-Taliente · kitft/natural_language_autoencoders](https://github.com/kitft/natural_language_autoencoders)
 *   **Built for:** Platanus Hack 2026.
 
