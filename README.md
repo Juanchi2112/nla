@@ -1,16 +1,10 @@
-
-
-
-
-
 # 🗣️ Verbalize: Reading the LLM's Mind
 
 **Stop reading the model's press releases. Start reading its activations.**
 
-<p align="center">
-  <video src="https://github.com/user-attachments/assets/206c18e8-437f-4453-87e8-d83d65071915
-" width="100%" controls></video>
-</p>
+
+https://github.com/user-attachments/assets/206c18e8-437f-4453-87e8-d83d65071915
+
 
 [**Live Demo 🚀**](https://verbalize-nla.vercel.app/) | [**Audit Report 📊**](./audit/report.md) | [**Video Demo 🎥**](https://x.com/AlexBodner_/status/2056857864400990580?s=20)
 
@@ -48,13 +42,9 @@ Our `audit/` engine generates adversarial probes to find **Fragile Passes**: cas
 
 ## 🛠️ How It Works
 
-<p align="center">
-  <video src="https://github.com/user-attachments/assets/fd9ec184-96a4-4ca7-927b-cd8306125087
 
 https://github.com/user-attachments/assets/72f28044-b23e-4c2f-87b3-65f86544ff04
 
-" width="100%" controls></video>
-</p>
 
 Verbalize intercept the **Layer 20 residual stream**—the "semantic sweet spot" where the model has formed its intent but hasn't yet collapsed onto a specific token. 
 
