@@ -96,7 +96,7 @@ See [**DEPLOY.md**](./DEPLOY.md) for the full guide on setting up the SGLang GPU
 ---
 
 ## 🏆 Credits
-*   **Authors:** Juan Ignacio Quiroga, Ana Paula Tissera, Ignacio Vargas, Joaquin Alderete, and Alexander Bodner.
+*   **Authors:** Juan Andres Quiroga, Ana Paula Tissera, Ignacio Vargas, Joaquin Alderete, and Alexander Bodner.
 *   **NLA Models & Research:** [Kit Fraser-Taliente · kitft/natural_language_autoencoders](https://github.com/kitft/natural_language_autoencoders)
 *   **Built for:** Platanus Hack 2026.
 
