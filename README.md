@@ -1,3 +1,9 @@
+
+
+https://github.com/user-attachments/assets/206c18e8-437f-4453-87e8-d83d65071915
+
+
+
 # 🗣️ Verbalize: Reading the LLM's Mind
 
 **Stop reading the model's press releases. Start reading its activations.**
@@ -6,7 +12,11 @@
   <video src="REPLACE_WITH_DEMO_VIDEO_URL" width="100%" controls></video>
 </p>
 
-[**Live Demo 🚀**](https://verbalize-nla.vercel.app/) | [**Audit Report 📊**](./audit/report.md) | [**Video Demo 🎥**](https://x.com/AlexBodner_/status/2056857864400990580?s=20)
+[**Live Demo 🚀**](https://verbalize-nla.vercel.app/) | [**Audit Report 📊**](./audit/report.md) | [**Video Demo 🎥**](https://x.com/AlexBodner_/status/205685
+
+https://github.com/user-attachments/assets/fd9ec184-96a4-4ca7-927b-cd8306125087
+
+7864400990580?s=20)
 
 ---
 
