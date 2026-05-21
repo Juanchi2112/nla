@@ -2,8 +2,8 @@
 
 **Stop reading the model's press releases. Start reading its activations.**
 
+https://github.com/user-attachments/assets/72f28044-b23e-4c2f-87b3-65f86544ff04
 
-https://github.com/user-attachments/assets/206c18e8-437f-4453-87e8-d83d65071915
 
 
 [**Live Demo 🚀**](https://verbalize-nla.vercel.app/) | [**Audit Report 📊**](./audit/report.md) | [**Video Demo 🎥**](https://x.com/AlexBodner_/status/2056857864400990580?s=20)
@@ -43,8 +43,8 @@ Our `audit/` engine generates adversarial probes to find **Fragile Passes**: cas
 ## 🛠️ How It Works
 
 
-https://github.com/user-attachments/assets/72f28044-b23e-4c2f-87b3-65f86544ff04
 
+https://github.com/user-attachments/assets/206c18e8-437f-4453-87e8-d83d65071915
 
 Verbalize intercept the **Layer 20 residual stream**—the "semantic sweet spot" where the model has formed its intent but hasn't yet collapsed onto a specific token. 
 
